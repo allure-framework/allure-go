@@ -1,0 +1,12 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and support
+    url: https://github.com/orgs/allure-framework/discussions/categories/questions-support
+    about: Ask usage questions and get help from the community.
+  - name: Allure Report documentation
+    url: https://allurereport.org/docs/
+    about: Read the official Allure documentation.
+  - name: Allure TestOps support
+    url: https://help.qameta.io/support/home
+    about: Report Allure TestOps issues here.
+

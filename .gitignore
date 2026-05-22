@@ -1,0 +1,24 @@
+.allure
+.DS_Store
+
+# Go
+bin/
+coverage.out
+*.test
+
+# Allure
+**/allure-results/
+**/allure-report/
+
+# Editors
+.idea/*
+!.idea/vcs.xml
+!.idea/icon.png
+*.iml
+*.ipr
+.vscode/
+
+# Build output
+build/
+dist/
+out/

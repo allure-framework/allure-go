@@ -1,0 +1,163 @@
+name: Release
+run-name: Release v${{ inputs.releaseVersion }} by ${{ github.actor }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      releaseVersion:
+        description: "Release version without v prefix, for example 0.1.0"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_VERSION: ${{ inputs.releaseVersion }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.x"
+          cache-dependency-path: |
+            **/go.mod
+            **/go.sum
+
+      - name: Validate inputs
+        shell: bash
+        run: |
+          [ "${GITHUB_REF_TYPE}" = "branch" ]
+          [[ "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
+
+      - name: Discover modules
+        shell: bash
+        run: |
+          if [ -f go.work ]; then
+            go work edit -json | sed -n 's/.*"DiskPath": "\(.*\)".*/\1/p' | sed 's#^\./##' | sort > .release-modules
+          else
+            find . -name go.mod -not -path './.git/*' -exec dirname {} \; | sed 's#^\./##' | sort > .release-modules
+          fi
+
+          mapfile -t module_dirs < .release-modules
+          if [ "${#module_dirs[@]}" -eq 0 ]; then
+            echo "No Go modules found"
+            exit 1
+          fi
+
+          printf 'Modules to release:\n'
+          printf '- %s\n' "${module_dirs[@]}"
+
+      - name: Pin internal module dependencies
+        shell: bash
+        run: |
+          mapfile -t module_dirs < .release-modules
+
+          declare -A module_paths=()
+          for module_dir in "${module_dirs[@]}"; do
+            module_paths["${module_dir}"]="$(cd "${module_dir}" && go list -m -f '{{ .Path }}')"
+          done
+
+          for module_dir in "${module_dirs[@]}"; do
+            module_path="${module_paths[${module_dir}]}"
+            for dep_dir in "${module_dirs[@]}"; do
+              dep_path="${module_paths[${dep_dir}]}"
+              if [ "${module_path}" = "${dep_path}" ]; then
+                continue
+              fi
+              if awk -v dep="${dep_path}" '
+                $1 == "require" && $2 == dep { found = 1 }
+                $1 == dep && $2 ~ /^v/ { found = 1 }
+                END { exit !found }
+              ' "${module_dir}/go.mod"; then
+                (cd "${module_dir}" && go mod edit -require="${dep_path}@v${RELEASE_VERSION}")
+              fi
+            done
+          done
+
+      - name: Tidy modules
+        shell: bash
+        run: |
+          while IFS= read -r module_dir || [ -n "${module_dir}" ]; do
+            (cd "${module_dir}" && go mod tidy)
+          done < .release-modules
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          while IFS= read -r module_dir || [ -n "${module_dir}" ]; do
+            unformatted="$(gofmt -l "${module_dir}")"
+            if [ -n "${unformatted}" ]; then
+              printf 'gofmt is required for:\n%s\n' "${unformatted}"
+              exit 1
+            fi
+          done < .release-modules
+
+      - name: Vet
+        shell: bash
+        run: |
+          while IFS= read -r module_dir || [ -n "${module_dir}" ]; do
+            (cd "${module_dir}" && go vet ./...)
+          done < .release-modules
+
+      - name: Test
+        shell: bash
+        run: |
+          while IFS= read -r module_dir || [ -n "${module_dir}" ]; do
+            (cd "${module_dir}" && go test -count=1 ./...)
+          done < .release-modules
+
+      - name: Commit release dependency pins
+        shell: bash
+        run: |
+          mapfile -t changed_files < <(git status --porcelain -- '**/go.mod' '**/go.sum' go.work go.work.sum | sed 's/^...//')
+          if [ "${#changed_files[@]}" -eq 0 ]; then
+            echo "No release dependency changes to commit"
+            exit 0
+          fi
+
+          git add -- "${changed_files[@]}"
+          git commit -m "chore: prepare v${RELEASE_VERSION} release"
+          git push origin HEAD:${GITHUB_REF_NAME}
+
+      - name: Create tags
+        shell: bash
+        run: |
+          : > .release-tags
+
+          while IFS= read -r module_dir || [ -n "${module_dir}" ]; do
+            if [ "${module_dir}" = "." ]; then
+              tag="v${RELEASE_VERSION}"
+            else
+              tag="${module_dir}/v${RELEASE_VERSION}"
+            fi
+
+            if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+              echo "Tag ${tag} already exists"
+              exit 1
+            fi
+
+            git tag "${tag}"
+            printf '%s\n' "${tag}" >> .release-tags
+          done < .release-modules
+
+          mapfile -t tags < .release-tags
+          git push origin "${tags[@]}"
+
+      - name: Create GitHub releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          while IFS= read -r tag || [ -n "${tag}" ]; do
+            gh release create "${tag}" --title "${tag}" --generate-notes
+          done < .release-tags

@@ -1,0 +1,68 @@
+name: Bug report
+description: Report a reproducible problem in Allure Go.
+title: "Bug: "
+labels: ["type:bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Please include enough detail for us to reproduce it.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and what you expected instead.
+    validations:
+      required: true
+  - type: dropdown
+    id: package
+    attributes:
+      label: Affected package
+      multiple: true
+      options:
+        - commons
+        - commons/gotest
+        - unknown
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Allure Go version
+      placeholder: commons/v0.1.0
+    validations:
+      required: true
+  - type: input
+    id: go-version
+    attributes:
+      label: Go version
+      placeholder: go version go1.26.0 linux/amd64
+    validations:
+      required: true
+  - type: input
+    id: allure-version
+    attributes:
+      label: Allure Report version
+      placeholder: 3.8.2
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide a minimal test, repository, or command sequence.
+      placeholder: |
+        go test -count=1 ./...
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: Result files or logs
+      description: Attach relevant allure-results files, report screenshots, or console output.
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct.
+          required: true
+

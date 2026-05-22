@@ -1,0 +1,41 @@
+name: Feature request
+description: Suggest an improvement for Allure Go.
+title: "Feature: "
+labels: ["type:feature", "triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What use case should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Describe the API, behavior, or documentation change you would like.
+    validations:
+      required: true
+  - type: dropdown
+    id: package
+    attributes:
+      label: Target package
+      multiple: true
+      options:
+        - commons
+        - commons/gotest
+        - new package
+        - documentation
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Describe any workaround or alternative design you considered.
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      options:
+        - label: I agree to follow this project's Code of Conduct.
+          required: true
