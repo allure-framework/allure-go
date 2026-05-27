@@ -133,10 +133,20 @@ jobs:
         shell: bash
         run: |
           : > .release-tags
+          git tag --list 'v[0-9]*' --sort=-version:refname | head -n 1 > .release-previous-tag
+          release_tag="v${RELEASE_VERSION}"
+
+          if git rev-parse -q --verify "refs/tags/${release_tag}" >/dev/null; then
+            echo "Tag ${release_tag} already exists"
+            exit 1
+          fi
+
+          git tag "${release_tag}"
+          printf '%s\n' "${release_tag}" >> .release-tags
 
           while IFS= read -r module_dir || [ -n "${module_dir}" ]; do
             if [ "${module_dir}" = "." ]; then
-              tag="v${RELEASE_VERSION}"
+              continue
             else
               tag="${module_dir}/v${RELEASE_VERSION}"
             fi
@@ -153,11 +163,16 @@ jobs:
           mapfile -t tags < .release-tags
           git push origin "${tags[@]}"
 
-      - name: Create GitHub releases
+      - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          while IFS= read -r tag || [ -n "${tag}" ]; do
-            gh release create "${tag}" --title "${tag}" --generate-notes
-          done < .release-tags
+          release_tag="v${RELEASE_VERSION}"
+          args=("${release_tag}" --title "${release_tag}" --generate-notes --verify-tag)
+
+          if [ -s .release-previous-tag ]; then
+            args+=(--notes-start-tag "$(cat .release-previous-tag)")
+          fi
+
+          gh release create "${args[@]}"
