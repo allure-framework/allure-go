@@ -55,7 +55,7 @@ jobs:
           fi
 
           printf 'Modules to release:\n'
-          printf '- %s\n' "${module_dirs[@]}"
+          printf -- '- %s\n' "${module_dirs[@]}"
 
       - name: Pin internal module dependencies
         shell: bash
