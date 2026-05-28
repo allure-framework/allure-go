@@ -22,7 +22,7 @@ jobs:
     name: ${{ matrix.module }} Go 1.${{ matrix.go }}.x on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     env:
-      ALLURE_MATRIX_ENV: ${{ matrix.module }}-${{ matrix.os }}-go-1-${{ matrix.go }}-x
+      ALLURE_MATRIX_ENV: ${{ matrix.os }}-go-1-${{ matrix.go }}-x
       ALLURE_LABEL_MODULE: ${{ matrix.module }}
       ALLURE_TEST_DUMP_NAME: allure-results-${{ matrix.module }}-${{ matrix.os }}-go-1.${{ matrix.go }}.x
     strategy:
