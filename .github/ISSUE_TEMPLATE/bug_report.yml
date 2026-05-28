@@ -22,6 +22,7 @@ body:
       options:
         - commons
         - commons/gotest
+        - testify
         - unknown
     validations:
       required: true
@@ -29,7 +30,7 @@ body:
     id: version
     attributes:
       label: Allure Go version
-      placeholder: commons/v0.1.0
+      placeholder: commons/v1.0.0 or testify/v1.0.0
     validations:
       required: true
   - type: input
@@ -65,4 +66,3 @@ body:
       options:
         - label: I agree to follow this project's Code of Conduct.
           required: true
-

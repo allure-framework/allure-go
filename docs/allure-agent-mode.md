@@ -41,12 +41,12 @@ ALLURE_RESULTS_DIR="$TMP_DIR/allure-results" \
 allure agent \
   --output "$TMP_DIR/agent-output" \
   --expectations "$EXPECTATIONS" \
-  -- go test -count=1 ./commons/...
+  -- go test -count=1 ./commons/... ./testify/...
 
 printf 'Agent overview: %s\n' "$TMP_DIR/agent-output/index.md"
 ```
 
-For a focused package, keep the same pattern and narrow the Go package path:
+For a focused package or module, keep the same pattern and narrow the Go package path:
 
 ```bash
 GOCACHE="$TMP_DIR/go-cache" \
@@ -54,7 +54,7 @@ ALLURE_RESULTS_DIR="$TMP_DIR/allure-results" \
 allure agent \
   --output "$TMP_DIR/agent-output" \
   --expectations "$EXPECTATIONS" \
-  -- go test -count=1 ./commons/writer
+  -- go test -count=1 ./testify/...
 ```
 
 ## Go Integration Notes

@@ -25,6 +25,7 @@ body:
       options:
         - commons
         - commons/gotest
+        - testify
         - new package
         - documentation
   - type: textarea

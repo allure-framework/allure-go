@@ -347,6 +347,28 @@ func (a *Context) T() *testing.T {
 	return a.t
 }
 
+// Helper marks the caller as a test helper on the underlying testing.T.
+func (a *Context) Helper() {
+	a.t.Helper()
+}
+
+// Errorf reports a formatted test failure on the underlying testing.T.
+func (a *Context) Errorf(format string, args ...interface{}) {
+	a.t.Helper()
+	a.t.Errorf(format, args...)
+}
+
+// FailNow marks the test failed and stops execution on the underlying testing.T.
+func (a *Context) FailNow() {
+	a.t.Helper()
+	a.t.FailNow()
+}
+
+// Name returns the underlying testing.T name.
+func (a *Context) Name() string {
+	return a.t.Name()
+}
+
 // Context returns the context carrying the active Allure runtime state.
 func (a *Context) Context() context.Context {
 	return a.ctx

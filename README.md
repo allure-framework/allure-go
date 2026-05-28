@@ -77,6 +77,37 @@ If `ALLURE_TESTPLAN_PATH` points to an Allure test plan, `gotest` uses static me
 
 The helper also exposes `a.DisplayName`, `a.TestCaseName`, `a.HistoryID`, `a.Link`, `a.StepDescription`, `a.GlobalAttachment`, and `a.GlobalError` for tests that need richer report metadata, step evidence, or run-level diagnostics.
 
+## Testify Assertions
+
+Use the Allure testify proxy packages when you want each `assert` or `require` call to appear as an Allure step:
+
+```diff
+ import (
+-	"github.com/stretchr/testify/assert"
+-	"github.com/stretchr/testify/require"
++	"github.com/allure-framework/allure-go/testify/assert"
++	"github.com/allure-framework/allure-go/testify/require"
+ )
+```
+
+```go
+import (
+	allure "github.com/allure-framework/allure-go/commons/gotest"
+	"github.com/allure-framework/allure-go/testify/assert"
+	"github.com/allure-framework/allure-go/testify/require"
+)
+
+func TestProfile(t *testing.T) {
+	allure.Test(t, "loads profile", func(a *allure.Context) {
+		assert.Equal(a, "alice", profile.Name)
+		require.NoError(a, err)
+		assert.New(a).Len(profile.Roles, 2)
+	})
+}
+```
+
+Replacing only the imports keeps normal testify behavior for calls such as `assert.Equal(t, expected, actual)`. Pass an Allure-aware test context, such as `*gotest.Context`, instead of `*testing.T` when you want assertion calls to be reported as steps. Other integrations can enable the same behavior by exposing the commons `ContextProvider` contract. Passing `t` or `a.T()` keeps ordinary testify behavior without Allure assertion steps.
+
 ## Generate a Report
 
 After your tests generate `./allure-results`, create the HTML report with one of the supported report generators.
@@ -125,6 +156,17 @@ go get github.com/allure-framework/allure-go/commons/gotest
 ```
 
 Use it when you want to report Allure steps, metadata, and attachments from regular Go tests without changing test runners.
+
+### `testify/assert` and `testify/require`
+
+Drop-in testify-compatible assertion packages that proxy upstream `github.com/stretchr/testify/assert` and `github.com/stretchr/testify/require` calls while reporting each call as an Allure step.
+
+```bash
+go get github.com/allure-framework/allure-go/testify/assert
+go get github.com/allure-framework/allure-go/testify/require
+```
+
+These packages live in the separate `github.com/allure-framework/allure-go/testify` module and depend on `commons` for Allure runtime reporting.
 
 ### `commons`
 

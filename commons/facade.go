@@ -23,6 +23,14 @@ type ParameterOptions struct {
 	Mode     model.ParameterMode
 }
 
+// ContextProvider exposes the Go context carrying active Allure runtime state.
+//
+// Framework integrations should implement this interface on their test context
+// type when helper libraries need to report to the current Allure test or step.
+type ContextProvider interface {
+	Context() context.Context
+}
+
 // Label adds one test-level Allure label.
 func Label(ctx context.Context, name string, value string) error {
 	return Labels(ctx, model.Label{Name: name, Value: value})
