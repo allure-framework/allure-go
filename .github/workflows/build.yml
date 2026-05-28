@@ -28,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [commons]
+        module: [commons, testify]
         go: ["25", "26"]
         os: [ubuntu-latest, windows-latest]
     defaults:

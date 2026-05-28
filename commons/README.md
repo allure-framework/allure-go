@@ -11,6 +11,7 @@ It currently provides:
 - `testplan`: `ALLURE_TESTPLAN_PATH` loading and matching helpers
 - `ids`: UUID, test case identity, and history identity helpers
 - `clock`: epoch-millisecond timing helpers
+- `ContextProvider`: a shared contract for framework test contexts that expose the active Allure runtime context
 - package-root facade helpers that safely no-op without an active runtime
 
 ## Facade Example

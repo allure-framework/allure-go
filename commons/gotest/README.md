@@ -31,3 +31,24 @@ Each `allure.Test` call creates a Go subtest with `t.Run`, so failures, skips, l
 By default, results are written to `./allure-results`. Set `ALLURE_RESULTS_DIR` to choose another directory.
 
 Set `ALLURE_LABEL_<NAME>` environment variables to add labels to every reported test in the run. Names are normalized to Allure-style lower camel case, so `ALLURE_LABEL_MODULE=commons` becomes `module=commons` and `ALLURE_LABEL_PARENT_SUITE=runtime` becomes `parentSuite=runtime`.
+
+## Testify Assertions
+
+Use the separate `github.com/allure-framework/allure-go/testify` module when testify assertion calls should appear as Allure steps:
+
+```diff
+ import (
+-	"github.com/stretchr/testify/assert"
+-	"github.com/stretchr/testify/require"
++	"github.com/allure-framework/allure-go/testify/assert"
++	"github.com/allure-framework/allure-go/testify/require"
+ )
+```
+
+```go
+assert.Equal(a, expected, actual)
+require.NoError(a, err)
+assert.New(a).Len(items, 2)
+```
+
+Replacing only the imports keeps normal testify behavior for calls that still pass `t *testing.T`. Pass an Allure-aware test context, such as this package's `*Context`, to report assertion steps. Other integrations can enable the same behavior by exposing the commons `ContextProvider` contract. Passing `t` or `a.T()` keeps regular testify behavior without assertion-step reporting.
