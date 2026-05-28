@@ -141,6 +141,35 @@ func TestHelperWritesResultAndStep(t *testing.T) {
 	})
 }
 
+func TestStepReturnsTypedValue(t *testing.T) {
+	Test(t, "typed step helper returns body value", func(a *Context) {
+		a.Description("Uses the package-level generic Step helper to return a typed value from a reported step. " +
+			"The expected result is that the step body can still add step metadata while the caller receives the produced value.")
+
+		a.Step("return value from generic step helper", func(a *Context) {
+			value := Step(a, "build client token", func(a *Context) typedStepValue {
+				a.StepParameter("kind", "token")
+				return typedStepValue{Token: "token-123"}
+			})
+			a.Attachment("returned typed value", []byte(value.Token), "text/plain")
+			if value.Token != "token-123" {
+				a.T().Fatalf("unexpected typed step value: %#v", value)
+			}
+		})
+
+		a.Step("return zero value when body is nil", func(a *Context) {
+			value := Step[int](a, "nil typed body", nil)
+			if value != 0 {
+				a.T().Fatalf("expected zero value from nil body, got %d", value)
+			}
+		})
+	})
+}
+
+type typedStepValue struct {
+	Token string
+}
+
 func TestStaticOptionsWriteInitialMetadata(t *testing.T) {
 	Test(t, "static options write initial metadata", func(a *Context) {
 		a.Description("Runs a gotest child test with static options and a test plan loaded before the test body, then verifies the metadata written to the generated child result. " +
