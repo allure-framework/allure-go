@@ -331,14 +331,20 @@ func TestFacadeConvenienceLabelsAndStepWrapper(t *testing.T) {
 			stepErr := commons.Step(ctx, "broken facade step", func(context.Context) error {
 				return fmt.Errorf("body failed")
 			})
+			value, valueErr := commons.StepValue[string](ctx, "value facade step", func(stepCtx context.Context) (string, error) {
+				return "created-42", commons.StepParameter(stepCtx, "phase", "value")
+			})
 			a.Attachment("step wrapper messages", []byte(messageTypes(recorder.messages[beforeSteps:])), "text/plain")
 			if stepErr == nil {
 				a.T().Fatalf("expected body error from broken step")
 			}
+			if valueErr != nil || value != "created-42" {
+				a.T().Fatalf("typed value step returned value=%q err=%v", value, valueErr)
+			}
 
 			stepMessages := recorder.messages[beforeSteps:]
-			if len(stepMessages) != 5 {
-				a.T().Fatalf("expected five step messages, got %d: %#v", len(stepMessages), stepMessages)
+			if len(stepMessages) != 8 {
+				a.T().Fatalf("expected eight step messages, got %d: %#v", len(stepMessages), stepMessages)
 			}
 			if stepMessages[0].Type != allureruntime.MessageStepStart || stepMessages[2].StepStop.Status != model.StatusPassed {
 				a.T().Fatalf("passing step messages are wrong: %#v", stepMessages[:3])
@@ -347,7 +353,10 @@ func TestFacadeConvenienceLabelsAndStepWrapper(t *testing.T) {
 				a.T().Fatalf("step parameter options were not emitted: %#v", stepMessages[1].StepMetadata.Parameters)
 			}
 			if stepMessages[3].Type != allureruntime.MessageStepStart || stepMessages[4].StepStop.Status != model.StatusBroken {
-				a.T().Fatalf("broken step messages are wrong: %#v", stepMessages[3:])
+				a.T().Fatalf("broken step messages are wrong: %#v", stepMessages[3:5])
+			}
+			if stepMessages[5].StepStart.Name != "value facade step" || stepMessages[7].StepStop.Status != model.StatusPassed {
+				a.T().Fatalf("value step messages are wrong: %#v", stepMessages[5:])
 			}
 		})
 	})

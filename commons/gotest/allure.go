@@ -430,6 +430,18 @@ func (a *Context) Step(name string, body func(*Context)) {
 	}
 }
 
+// Step reports body as an Allure step and returns the value produced by body.
+func Step[T any](a *Context, name string, body func(*Context) T) (value T) {
+	a.t.Helper()
+
+	a.Step(name, func(step *Context) {
+		if body != nil {
+			value = body(step)
+		}
+	})
+	return value
+}
+
 // Label adds one test-level label.
 func (a *Context) Label(name string, value string) {
 	a.t.Helper()

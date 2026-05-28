@@ -12,9 +12,14 @@ func TestLogin(t *testing.T) {
 			a.Parameter("user", "alice")
 			a.Attachment("request", []byte(`{"user":"alice"}`), "application/json")
 		})
+		session := allure.Step(a, "create session", func(a *allure.Context) string {
+			a.StepParameter("endpoint", "/sessions")
+			return "session-1"
+		})
+		a.Parameter("session", session)
 	},
-		allure.WithOwner("qa-team"),
-		allure.WithTMS("AUTH-001", "https://example.test/AUTH-001"),
+	allure.WithOwner("qa-team"),
+	allure.WithTMS("AUTH-001", "https://example.test/AUTH-001"),
 		allure.WithAllureID("123"),
 		allure.WithTestCaseID("AUTH-001"),
 		allure.WithDescription("Checks that valid credentials create a session."),
@@ -23,6 +28,15 @@ func TestLogin(t *testing.T) {
 ```
 
 Use `a.T()` when test code needs the underlying `*testing.T`, and `a.Context()` when helper libraries need the active `context.Context`. Use `a.StepParameter`, `a.StepDisplayName`, and `a.StepDescription` for metadata that belongs to the currently running step, and `a.DisplayName`, `a.TestCaseName`, `a.HistoryID`, `a.GlobalAttachment`, and `a.GlobalError` when a test needs richer report metadata or run-level evidence.
+
+Use `a.Step` when the step body does not return a value. Use package-level `allure.Step` when the step should produce a typed value:
+
+```go
+token := allure.Step(a, "authorize", func(a *allure.Context) string {
+	a.StepParameter("user", "alice")
+	return "token-123"
+})
+```
 
 Use static `With...` options for metadata known before the body runs. They are applied before test-plan filtering, so `WithAllureID`, `WithTag`, `WithLabel`, `WithTestCaseID`, `WithDescription`, and related helpers can participate in `ALLURE_TESTPLAN_PATH` selection.
 

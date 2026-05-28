@@ -58,8 +58,12 @@ func TestLogin(t *testing.T) {
 			a.Attachment("request", []byte(`{"user":"alice"}`), "application/json")
 			a.T().Log("credentials submitted")
 		})
+		session := allure.Step(a, "create session", func(a *allure.Context) string {
+			return "session-1"
+		})
+		a.Parameter("session", session)
 	},
-		allure.WithOwner("qa-team"),
+	allure.WithOwner("qa-team"),
 		allure.WithAllureID("123"),
 		allure.WithTestCaseID("AUTH-001"),
 		allure.WithDescription("Checks that valid credentials create a session."),
@@ -71,11 +75,54 @@ The `gotest` helper writes `./allure-results` by default. Set `ALLURE_RESULTS_DI
 
 Each `allure.Test` call creates a Go subtest with `t.Run`, so separate Allure results keep the correct failure, skip, log, cleanup, and step ownership.
 
-Use static `allure.With...` options for metadata known before the body runs, especially `WithAllureID`, labels, descriptions, links, and IDs. Runtime methods on `a` are still available for metadata and evidence discovered during execution.
+Use static `allure.With...` options for metadata known before the body runs, especially `WithAllureID`, labels, descriptions, links, and IDs. Runtime methods on `a` are still available for metadata and evidence discovered during execution. Use `a.Step` for no-value steps and package-level `allure.Step` when a step should return a typed value.
 
 If `ALLURE_TESTPLAN_PATH` points to an Allure test plan, `gotest` uses static metadata and the Go full name to skip deselected tests before their body runs.
 
 The helper also exposes `a.DisplayName`, `a.TestCaseName`, `a.HistoryID`, `a.Link`, `a.StepDescription`, `a.GlobalAttachment`, and `a.GlobalError` for tests that need richer report metadata, step evidence, or run-level diagnostics.
+
+## HTTP Exchange Attachments
+
+Use `commons/httpexchange` when tests need structured request and response evidence in the Allure HTTP Exchange format. The helper emits `application/vnd.allure.http+json` attachments with the `.httpexchange` extension, so report viewers and API coverage tools can inspect method, URL, headers, cookies, query parameters, status, trailers, and captured bodies.
+
+For `httptest.Server`-based fake services, wrap the handler and pass the active Allure context:
+
+```go
+import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	allure "github.com/allure-framework/allure-go/commons/gotest"
+	"github.com/allure-framework/allure-go/commons/httpexchange"
+)
+
+func TestClientAgainstFakeService(t *testing.T) {
+	allure.Test(t, "client talks to fake service", func(a *allure.Context) {
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = fmt.Fprint(w, `{"ok":true}`)
+		})
+
+		server := httptest.NewServer(httpexchange.NewHandler(a.Context(), handler))
+		defer server.Close()
+
+		// Point the real client at server.URL. The report will include the
+		// request received by the fake service and the response it returned.
+	})
+}
+```
+
+For client-side capture, wrap a transport:
+
+```go
+client := &http.Client{
+	Transport: httpexchange.NewTransport(a.Context(), http.DefaultTransport),
+}
+```
+
+Low-level helpers are also available when a test or adapter already captured body bytes: `httpexchange.FromRequest`, `httpexchange.FromResponse`, `httpexchange.NewExchange`, and `httpexchange.Attach`. Use options such as `WithRedactedHeaders`, `WithRedactedQueryParameters`, `WithRedactedFormFields`, `WithBodyLimit`, and `WithAttachmentName` to tune capture behavior.
 
 ## Testify Assertions
 
@@ -156,6 +203,16 @@ go get github.com/allure-framework/allure-go/commons/gotest
 ```
 
 Use it when you want to report Allure steps, metadata, and attachments from regular Go tests without changing test runners.
+
+### `commons/httpexchange`
+
+Helpers for producing Allure HTTP Exchange attachments from Go's standard `net/http` types.
+
+```bash
+go get github.com/allure-framework/allure-go/commons/httpexchange
+```
+
+Use it to attach structured HTTP evidence from `*http.Request`, `*http.Response`, `httptest.Server` handlers, or client `http.RoundTripper` wrappers.
 
 ### `testify/assert` and `testify/require`
 

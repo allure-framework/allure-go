@@ -309,9 +309,21 @@ func LogStep(ctx context.Context, name string, status model.Status, details *mod
 }
 
 // Step runs body between StartStep and StopStep calls.
-func Step(ctx context.Context, name string, body func(context.Context) error) (err error) {
+func Step(ctx context.Context, name string, body func(context.Context) error) error {
+	_, err := StepValue[struct{}](ctx, name, func(ctx context.Context) (struct{}, error) {
+		if body == nil {
+			return struct{}{}, nil
+		}
+		return struct{}{}, body(ctx)
+	})
+	return err
+}
+
+// StepValue runs body between StartStep and StopStep calls and returns the
+// value produced by body.
+func StepValue[T any](ctx context.Context, name string, body func(context.Context) (T, error)) (value T, err error) {
 	if err := StartStep(ctx, name); err != nil {
-		return err
+		return value, err
 	}
 
 	defer func() {
@@ -322,16 +334,16 @@ func Step(ctx context.Context, name string, body func(context.Context) error) (e
 	}()
 
 	if body != nil {
-		if err = body(ctx); err != nil {
+		if value, err = body(ctx); err != nil {
 			stopErr := StopStep(ctx, model.StatusBroken, &model.StatusDetails{Message: err.Error()})
 			if stopErr != nil {
-				return stopErr
+				return value, stopErr
 			}
-			return err
+			return value, err
 		}
 	}
 
-	return StopStep(ctx, model.StatusPassed, nil)
+	return value, StopStep(ctx, model.StatusPassed, nil)
 }
 
 // Attachment adds an in-memory attachment to the active test or step.
