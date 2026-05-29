@@ -9,7 +9,7 @@ import (
 )
 
 func TestTestResultJSONShape(t *testing.T) {
-	allure.Test(t, "test result serializes to Allure JSON shape", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies that TestResult marshals to the minimal Allure result JSON shape expected by consumers. " +
 			"The expected result is stable field names and enum values for identity, status, stage, labels, and parameters.")
 
@@ -60,7 +60,7 @@ parameters=case:happy`), "text/plain")
 }
 
 func TestStatusDetailsJSONShape(t *testing.T) {
-	allure.Test(t, "status details serialize to Allure JSON shape", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies that StatusDetails marshals assertion details to the expected Allure JSON shape. " +
 			"The expected result is a compact object containing message, actual, and expected values.")
 
@@ -94,7 +94,7 @@ func TestStatusDetailsJSONShape(t *testing.T) {
 }
 
 func TestRunLevelModelJSONShape(t *testing.T) {
-	allure.Test(t, "run-level models serialize to Allure JSON shape", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies that run-level Allure model types preserve timestamped globals and executor metadata. " +
 			"The expected result is JSON containing a global attachment timestamp, a global error timestamp, and executor fields used by report generators.")
 

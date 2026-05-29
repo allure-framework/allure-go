@@ -12,7 +12,7 @@ import (
 )
 
 func TestCaptureResponseWriterOptionalInterfaces(t *testing.T) {
-	allure.Test(t, "capture response writer optional interfaces", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Covers the optional response writer interfaces preserved by the HTTP Exchange middleware. " +
 			"The expected result is delegated flush, push, hijack, read-from, close notification, and trailer capture behavior.")
 

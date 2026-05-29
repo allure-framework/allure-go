@@ -142,7 +142,7 @@ func TestHelperWritesResultAndStep(t *testing.T) {
 }
 
 func TestStepReturnsTypedValue(t *testing.T) {
-	Test(t, "typed step helper returns body value", func(a *Context) {
+	Wrap(t, func(a *Context) {
 		a.Description("Uses the package-level generic Step helper to return a typed value from a reported step. " +
 			"The expected result is that the step body can still add step metadata while the caller receives the produced value.")
 
@@ -393,7 +393,7 @@ func TestTitlePathIncludesPackageFolders(t *testing.T) {
 }
 
 func TestSuiteLabelsFromSingleElementTitlePath(t *testing.T) {
-	Test(t, "single-element title path becomes suite label", func(a *Context) {
+	Wrap(t, func(a *Context) {
 		a.Description("Verifies the suite label rule for a title path containing only one segment. " +
 			"The expected result is that the segment is reported as the suite label and no parentSuite or subSuite label is generated.")
 
@@ -413,7 +413,7 @@ func TestSuiteLabelsFromSingleElementTitlePath(t *testing.T) {
 }
 
 func TestSuiteLabelsFromTwoElementTitlePath(t *testing.T) {
-	Test(t, "two-element title path becomes parent suite and suite labels", func(a *Context) {
+	Wrap(t, func(a *Context) {
 		a.Description("Verifies the suite label rule for a title path containing two segments. " +
 			"The expected result is that the first segment becomes parentSuite, the second segment becomes suite, and no subSuite label is generated.")
 
@@ -436,7 +436,7 @@ func TestSuiteLabelsFromTwoElementTitlePath(t *testing.T) {
 }
 
 func TestSuiteLabelsFromLongTitlePath(t *testing.T) {
-	Test(t, "long title path becomes parent suite suite and joined sub suite", func(a *Context) {
+	Wrap(t, func(a *Context) {
 		a.Description("Verifies the suite label rule for a title path containing more than two segments. " +
 			"The expected result is that the first two segments become parentSuite and suite, while the remaining path is joined with the > separator and reported as subSuite.")
 
@@ -460,7 +460,7 @@ func TestSuiteLabelsFromLongTitlePath(t *testing.T) {
 }
 
 func TestExplicitSuiteLabelsOverrideGeneratedTitlePathLabels(t *testing.T) {
-	Test(t, "explicit suite labels override generated title path labels", func(a *Context) {
+	Wrap(t, func(a *Context) {
 		a.Description("Verifies that static or environment-provided suite labels can override the defaults derived from titlePath. " +
 			"The expected result is that no generated parentSuite, suite, or subSuite label is added when all three suite hierarchy labels are already explicit.")
 
@@ -486,7 +486,7 @@ func TestExplicitSuiteLabelsOverrideGeneratedTitlePathLabels(t *testing.T) {
 }
 
 func TestLabelsFromEnv(t *testing.T) {
-	Test(t, "environment labels map to Allure labels", func(a *Context) {
+	Wrap(t, func(a *Context) {
 		a.Description("Verifies that gotest can read module-level labels from environment variables. " +
 			"The expected result is that ALLURE_LABEL_MODULE becomes module and ALLURE_LABEL_PARENT_SUITE becomes parentSuite while empty and unrelated variables are ignored.")
 

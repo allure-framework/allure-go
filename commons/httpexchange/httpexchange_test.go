@@ -15,7 +15,7 @@ import (
 )
 
 func TestNewExchangeConvertsHTTPValues(t *testing.T) {
-	allure.Test(t, "http exchange converts standard http values", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Builds an HTTP Exchange payload from standard net/http request and response values. " +
 			"The expected result is a schema v1 attachment payload with method, redacted URL/query/header/cookie/form values, status, body, trailers, and timestamps.")
 
@@ -91,7 +91,7 @@ func TestNewExchangeConvertsHTTPValues(t *testing.T) {
 }
 
 func TestAttachWritesHTTPExchangeAttachment(t *testing.T) {
-	allure.Test(t, "http exchange attach writes typed attachment", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Runs a callback inside an isolated reported test context and attaches an HTTP Exchange payload through the package helper. " +
 			"The expected result is a typed application/vnd.allure.http+json attachment with the .httpexchange source extension and schema v1 JSON payload.")
 
@@ -138,7 +138,7 @@ func TestAttachWritesHTTPExchangeAttachment(t *testing.T) {
 }
 
 func TestHandlerCapturesHttptestServerExchange(t *testing.T) {
-	allure.Test(t, "handler captures httptest server exchange", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Runs a real http.Client request against an httptest.Server wrapped with the HTTP Exchange handler middleware. " +
 			"The expected result is one server-side exchange attachment containing the received request body and the response returned by the fake service.")
 
@@ -202,7 +202,7 @@ func TestHandlerCapturesHttptestServerExchange(t *testing.T) {
 }
 
 func TestTransportCapturesClientExchange(t *testing.T) {
-	allure.Test(t, "transport captures client exchange", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Runs an http.Client using the HTTP Exchange transport wrapper against an httptest.Server. " +
 			"The expected result is one client-side exchange attachment after response body close, including request and response bodies.")
 
@@ -274,7 +274,9 @@ func runWithinTestContext(t *testing.T, body func(*allure.Context), ids ...strin
 		options = append(options, allure.WithIDGenerator(fixedIDs(ids...)))
 	}
 
-	allure.Test(t, "test context", body, options...)
+	t.Run("test context", func(t *testing.T) {
+		allure.Test(t, "test context", body, options...)
+	})
 	return memory.Snapshot()
 }
 

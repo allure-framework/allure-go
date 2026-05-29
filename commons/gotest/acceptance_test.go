@@ -34,7 +34,7 @@ type producedFile struct {
 }
 
 func TestGotestRunContractStatusesAndMetadata(t *testing.T) {
-	Test(t, "gotest run contract statuses and metadata", func(a *Context) {
+	Wrap(t, func(a *Context) {
 		a.Description("Creates temporary Go projects and runs them through the gotest adapter in separate Go processes for passed, failed, broken, and skipped outcomes. " +
 			"The expected result is that each child process writes a real Allure result with the correct status, full name, title path, explicit identifiers, metadata, step status, attachments, and global artifacts.")
 
@@ -74,7 +74,7 @@ func TestGotestRunContractStatusesAndMetadata(t *testing.T) {
 }
 
 func TestGotestConfigurationResultsDirectory(t *testing.T) {
-	Test(t, "gotest configuration resolves result directories", func(a *Context) {
+	Wrap(t, func(a *Context) {
 		a.Description("Verifies the result directory behavior used by command-line Go test runs. " +
 			"The expected result is that an absolute ALLURE_RESULTS_DIR is honored and, when it is unset, the adapter writes to an allure-results directory below the test process working directory.")
 
@@ -114,7 +114,7 @@ func TestGotestConfigurationResultsDirectory(t *testing.T) {
 }
 
 func TestGotestSubtestsAndParallelIsolation(t *testing.T) {
-	Test(t, "gotest subtests and parallel runs isolate results", func(a *Context) {
+	Wrap(t, func(a *Context) {
 		a.Description("Creates temporary Go projects whose tests emit multiple reported subtests and parallel reported tests with shared result directories. " +
 			"The expected result is that every Allure result keeps its own label, step, and attachment evidence without leaking metadata across sibling or parallel tests.")
 
@@ -142,8 +142,73 @@ func TestGotestSubtestsAndParallelIsolation(t *testing.T) {
 	})
 }
 
+func TestGotestWrapReportsCurrentTest(t *testing.T) {
+	Wrap(t, func(a *Context) {
+		a.Description("Creates temporary Go projects whose tests use Wrap for one Go test to one Allure result. " +
+			"The expected result is that Wrap uses the current Go test name without duplicating the title path and rejects conflicting same-test helper usage.")
+
+		a.Step("verify Wrap reports current test without duplicate title path", func(a *Context) {
+			run := runProbe(a, "^TestWrappedCurrentTest$", "", "", true, nil)
+
+			a.Step("verify wrapped current test process exit status", func(a *Context) {
+				assertProbeExit(a.T(), "wrapped current test", run.err, true, run.output)
+			})
+			a.Step("verify wrapped current test result identity", func(a *Context) {
+				result := requireOneResult(a.T(), run)
+				assertWrappedProbeResult(a.T(), result)
+			})
+			a.Step("verify wrapped current test attachment evidence", func(a *Context) {
+				content, ok := findAttachmentContent(run, "wrap payload")
+				if !ok {
+					a.T().Fatalf("missing wrap payload attachment: %#v", run.results)
+				}
+				if string(content) != "wrapped-current" {
+					a.T().Fatalf("unexpected wrap payload: %q", content)
+				}
+			})
+		})
+
+		a.Step("verify duplicate Wrap call fails clearly", func(a *Context) {
+			run := runProbe(a, "^TestDuplicateWrapFails$", "", "", true, nil)
+
+			a.Step("verify duplicate Wrap process exit status", func(a *Context) {
+				assertProbeExit(a.T(), "duplicate Wrap", run.err, false, run.output)
+			})
+			a.Step("verify duplicate Wrap diagnostic", func(a *Context) {
+				assertProbeOutputContains(a.T(), run, "allure.Wrap called more than once for TestDuplicateWrapFails; use allure.Test for multiple named Allure tests")
+			})
+		})
+
+		a.Step("verify Wrap after named Test fails clearly", func(a *Context) {
+			run := runProbe(a, "^TestWrapAfterNamedTestFails$", "", "", true, nil)
+
+			a.Step("verify Wrap after named Test process exit status", func(a *Context) {
+				assertProbeExit(a.T(), "Wrap after named Test", run.err, false, run.output)
+			})
+			a.Step("verify Wrap after named Test diagnostic", func(a *Context) {
+				assertProbeOutputContains(a.T(), run, "allure.Wrap called for TestWrapAfterNamedTestFails after allure.Test; use allure.Test for multiple named Allure tests")
+			})
+		})
+
+		a.Step("verify named Test inside Wrap fails clearly", func(a *Context) {
+			run := runProbe(a, "^TestNamedChildInsideWrapFails$", "", "", true, nil)
+
+			a.Step("verify named Test inside Wrap process exit status", func(a *Context) {
+				assertProbeExit(a.T(), "named Test inside Wrap", run.err, false, run.output)
+			})
+			a.Step("verify named Test inside Wrap diagnostic and failed result", func(a *Context) {
+				assertProbeOutputContains(a.T(), run, "allure.Test called for TestNamedChildInsideWrapFails after allure.Wrap; use allure.Test for multiple named Allure tests")
+				result := requireOneResult(a.T(), run)
+				if result.Status != model.StatusFailed {
+					a.T().Fatalf("expected wrapped result to fail, got %s: %#v", result.Status, result)
+				}
+			})
+		})
+	})
+}
+
 func TestGotestTestPlanFiltering(t *testing.T) {
-	Test(t, "gotest test plan filtering", func(a *Context) {
+	Wrap(t, func(a *Context) {
 		a.Description("Creates temporary Go projects and runs them with ALLURE_TESTPLAN_PATH configured for static metadata known before the test body executes. " +
 			"The expected result is that gotest executes and reports selected tests while deselected tests are skipped before their body can write evidence.")
 
@@ -610,6 +675,32 @@ func assertStatusProbeResult(t *testing.T, result model.TestResult, mode string,
 	}
 }
 
+func assertWrappedProbeResult(t *testing.T, result model.TestResult) {
+	t.Helper()
+
+	if result.Status != model.StatusPassed {
+		t.Fatalf("unexpected wrapped result status: %s", result.Status)
+	}
+	if result.Name != "TestWrappedCurrentTest" {
+		t.Fatalf("unexpected wrapped result name: %q", result.Name)
+	}
+	if result.TestCaseName != "TestWrappedCurrentTest" {
+		t.Fatalf("unexpected wrapped result test case name: %q", result.TestCaseName)
+	}
+	if result.FullName != "TestWrappedCurrentTest" {
+		t.Fatalf("unexpected wrapped result full name: %q", result.FullName)
+	}
+	if strings.Join(result.TitlePath, "\n") != "TestWrappedCurrentTest" {
+		t.Fatalf("unexpected wrapped result title path: %#v", result.TitlePath)
+	}
+	if !hasLabel(result.Labels, "framework", "go-test") || !hasLabel(result.Labels, "wrapCase", "current") {
+		t.Fatalf("missing wrapped result labels: %#v", result.Labels)
+	}
+	if len(result.Steps) != 1 {
+		t.Fatalf("expected one wrapped result step, got %#v", result.Steps)
+	}
+}
+
 func assertProbeGlobals(t *testing.T, run probeRun, mode string) {
 	t.Helper()
 
@@ -720,6 +811,14 @@ func findAttachmentContent(run probeRun, name string) ([]byte, bool) {
 	}
 
 	return nil, false
+}
+
+func assertProbeOutputContains(t *testing.T, run probeRun, text string) {
+	t.Helper()
+
+	if !strings.Contains(string(run.output), text) {
+		t.Fatalf("expected probe output to contain %q\n%s", text, run.output)
+	}
 }
 
 func findAttachmentContentInSteps(run probeRun, steps []model.StepResult, name string) ([]byte, bool) {

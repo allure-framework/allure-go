@@ -254,9 +254,23 @@ type Context struct {
 	runtime *testRuntime
 }
 
+type testClaim struct {
+	named   bool
+	wrapped bool
+}
+
+var testClaims = struct {
+	sync.Mutex
+	byTest map[*testing.T]*testClaim
+}{
+	byTest: map[*testing.T]*testClaim{},
+}
+
 // Test reports a Go subtest as one Allure test result.
 func Test(t *testing.T, name string, body func(*Context), opts ...Option) {
 	t.Helper()
+
+	claimNamedTest(t)
 
 	cfg := defaultOptions()
 	for _, opt := range opts {
@@ -268,6 +282,75 @@ func Test(t *testing.T, name string, body func(*Context), opts ...Option) {
 		t.Helper()
 		runTest(t, name, body, cfg)
 	})
+}
+
+// Wrap reports the current Go test as one Allure test result.
+//
+// It uses t.Name() as the default result name and does not create a named
+// child subtest. Use Test when one Go test should produce multiple named
+// Allure test results.
+func Wrap(t *testing.T, body func(*Context), opts ...Option) {
+	t.Helper()
+
+	claimWrappedTest(t)
+
+	cfg := defaultOptions()
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+	cfg.titlePathPrefix = callerTitlePathPrefix(1)
+
+	runTest(t, t.Name(), body, cfg)
+}
+
+func claimNamedTest(t *testing.T) {
+	t.Helper()
+
+	if message := claimTest(t, func(claim *testClaim) string {
+		if claim.wrapped {
+			return fmt.Sprintf("allure.Test called for %s after allure.Wrap; use allure.Test for multiple named Allure tests", t.Name())
+		}
+		claim.named = true
+		return ""
+	}); message != "" {
+		t.Fatal(message)
+	}
+}
+
+func claimWrappedTest(t *testing.T) {
+	t.Helper()
+
+	if message := claimTest(t, func(claim *testClaim) string {
+		switch {
+		case claim.wrapped:
+			return fmt.Sprintf("allure.Wrap called more than once for %s; use allure.Test for multiple named Allure tests", t.Name())
+		case claim.named:
+			return fmt.Sprintf("allure.Wrap called for %s after allure.Test; use allure.Test for multiple named Allure tests", t.Name())
+		default:
+			claim.wrapped = true
+			return ""
+		}
+	}); message != "" {
+		t.Fatal(message)
+	}
+}
+
+func claimTest(t *testing.T, update func(*testClaim) string) string {
+	testClaims.Lock()
+	defer testClaims.Unlock()
+
+	claim, ok := testClaims.byTest[t]
+	if !ok {
+		claim = &testClaim{}
+		testClaims.byTest[t] = claim
+		t.Cleanup(func() {
+			testClaims.Lock()
+			delete(testClaims.byTest, t)
+			testClaims.Unlock()
+		})
+	}
+
+	return update(claim)
 }
 
 func runTest(t *testing.T, name string, body func(*Context), cfg options) {

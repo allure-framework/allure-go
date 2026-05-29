@@ -17,7 +17,7 @@ import (
 var errWriterStopped = errors.New("writer stopped")
 
 func TestFileSystemWriterWritesArtifacts(t *testing.T) {
-	allure.Test(t, "filesystem writer writes Allure artifacts", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies that FileSystemWriter writes every supported Allure artifact type to disk. " +
 			"The expected result is deterministic files for test results, containers, attachments, environment info, categories, executor info, and global errors with the expected content.")
 
@@ -83,7 +83,7 @@ func TestFileSystemWriterWritesArtifacts(t *testing.T) {
 }
 
 func TestInMemoryWriterSnapshotsArtifacts(t *testing.T) {
-	allure.Test(t, "in-memory writer snapshots artifacts", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies that InMemoryWriter records every supported Allure artifact type without touching the filesystem. " +
 			"The expected result is a snapshot containing durable copies of results, containers, attachments, environment info, categories, executor info, and global artifacts.")
 
@@ -161,7 +161,7 @@ func TestInMemoryWriterSnapshotsArtifacts(t *testing.T) {
 }
 
 func TestMultiWriterFansOutAndStopsOnError(t *testing.T) {
-	allure.Test(t, "multi writer fans out and stops on error", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies that MultiWriter implements the full Writer interface by forwarding every public write method to each configured writer and stopping at the first error. " +
 			"The expected result is that successful calls reach both writers in order, nil writers are ignored, and a failing writer prevents later writers from receiving the failed call.")
 

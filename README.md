@@ -75,6 +75,20 @@ The `gotest` helper writes `./allure-results` by default. Set `ALLURE_RESULTS_DI
 
 Each `allure.Test` call creates a Go subtest with `t.Run`, so separate Allure results keep the correct failure, skip, log, cleanup, and step ownership.
 
+When a Go test function should produce exactly one Allure result, wrap the current test instead of creating a named child:
+
+```go
+func TestLogin(t *testing.T) {
+	allure.Wrap(t, func(a *allure.Context) {
+		a.Step("submit credentials", func(a *allure.Context) {
+			a.Parameter("user", "alice")
+		})
+	})
+}
+```
+
+`allure.Wrap` uses the current `t.Name()` by default and rejects additional named `allure.Test` calls on the same `*testing.T`. Use `allure.Test` when one Go test should produce multiple named Allure results.
+
 Use static `allure.With...` options for metadata known before the body runs, especially `WithAllureID`, labels, descriptions, links, and IDs. Runtime methods on `a` are still available for metadata and evidence discovered during execution. Use `a.Step` for no-value steps and package-level `allure.Step` when a step should return a typed value.
 
 If `ALLURE_TESTPLAN_PATH` points to an Allure test plan, `gotest` uses static metadata and the Go full name to skip deselected tests before their body runs.

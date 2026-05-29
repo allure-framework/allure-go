@@ -12,7 +12,7 @@ import (
 )
 
 func TestTransportCoversImmediateAndErrorBranches(t *testing.T) {
-	allure.Test(t, "transport covers immediate and error branches", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Exercises transport branches that attach before a response body is closed, plus response body read errors. " +
 			"The expected result is typed exchange attachments for transport errors, nil responses, no-body responses, dynamic names, and read failures.")
 

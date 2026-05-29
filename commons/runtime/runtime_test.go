@@ -19,7 +19,7 @@ func (r *recordingRuntime) Handle(_ context.Context, message allureruntime.Messa
 }
 
 func TestRuntimeFuncHandle(t *testing.T) {
-	allure.Test(t, "RuntimeFunc adapts a function to Runtime.Handle", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies the RuntimeFunc adapter method. " +
 			"The expected result is that calling Handle invokes the underlying function once with the same message.")
 
@@ -43,7 +43,7 @@ func TestRuntimeFuncHandle(t *testing.T) {
 }
 
 func TestNoopRuntime(t *testing.T) {
-	allure.Test(t, "Noop returns a runtime that accepts messages", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies the no-op runtime returned by runtime.Noop. " +
 			"The expected result is that Handle accepts a message and returns nil without requiring any active test state.")
 
@@ -58,7 +58,7 @@ func TestNoopRuntime(t *testing.T) {
 }
 
 func TestCurrentRuntimeState(t *testing.T) {
-	allure.Test(t, "Current returns no-op defaults and stored state", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies runtime.Current for nil, empty, and populated contexts. " +
 			"The expected result is that missing runtime state returns a usable no-op runtime and populated state is returned unchanged.")
 
@@ -101,7 +101,7 @@ func TestCurrentRuntimeState(t *testing.T) {
 }
 
 func TestWithRuntime(t *testing.T) {
-	allure.Test(t, "WithRuntime stores an active runtime", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies runtime.WithRuntime stores a runtime in context, including nil context input. " +
 			"The expected result is that Current returns the same runtime and nil runtimes are normalized to a no-op runtime.")
 
@@ -128,7 +128,7 @@ func TestWithRuntime(t *testing.T) {
 }
 
 func TestWithTest(t *testing.T) {
-	allure.Test(t, "WithTest stores the active test id", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies runtime.WithTest updates only the active test id in context. " +
 			"The expected result is that Current returns the supplied test id while preserving existing runtime state.")
 
@@ -145,7 +145,7 @@ func TestWithTest(t *testing.T) {
 }
 
 func TestWithScope(t *testing.T) {
-	allure.Test(t, "WithScope stores the active scope id", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies runtime.WithScope updates only the active scope id in context. " +
 			"The expected result is that Current returns the supplied scope id while preserving existing runtime state.")
 
@@ -162,7 +162,7 @@ func TestWithScope(t *testing.T) {
 }
 
 func TestWithFixture(t *testing.T) {
-	allure.Test(t, "WithFixture stores the active fixture id", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies runtime.WithFixture updates only the active fixture id in context. " +
 			"The expected result is that Current returns the supplied fixture id while preserving existing runtime state.")
 
@@ -179,7 +179,7 @@ func TestWithFixture(t *testing.T) {
 }
 
 func TestWithStep(t *testing.T) {
-	allure.Test(t, "WithStep stores the active step id", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies runtime.WithStep updates only the active step id in context. " +
 			"The expected result is that Current returns the supplied step id while preserving existing runtime state.")
 
@@ -196,7 +196,7 @@ func TestWithStep(t *testing.T) {
 }
 
 func TestFromContext(t *testing.T) {
-	allure.Test(t, "FromContext returns the active runtime", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies runtime.FromContext for populated and empty contexts. " +
 			"The expected result is that populated contexts return the stored runtime and empty contexts return a no-op runtime.")
 
@@ -221,7 +221,7 @@ func TestFromContext(t *testing.T) {
 }
 
 func TestEmit(t *testing.T) {
-	allure.Test(t, "Emit enriches and dispatches runtime messages", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies runtime.Emit copies lifecycle ids from context and dispatches to the active runtime. " +
 			"The expected result is that empty message ids inherit context ids, explicit message ids are preserved, and nil context emission falls back to no-op behavior.")
 

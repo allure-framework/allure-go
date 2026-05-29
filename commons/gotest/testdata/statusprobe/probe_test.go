@@ -99,6 +99,58 @@ func TestParallelIsolation(t *testing.T) {
 	}
 }
 
+func TestWrappedCurrentTest(t *testing.T) {
+	allure.Wrap(t, func(a *allure.Context) {
+		a.Description("Exercises Wrap against the current Go test. " +
+			"The expected result is a single Allure result named after the Go test without an additional named subtest segment in the title path.")
+		a.Label("wrapCase", "current")
+		a.Step("record wrapped test evidence", func(a *allure.Context) {
+			a.Attachment("wrap payload", []byte("wrapped-current"), "text/plain")
+		})
+	}, allure.WithIDGenerator(probeIDs("wrap-current")))
+}
+
+func TestDuplicateWrapFails(t *testing.T) {
+	allure.Wrap(t, func(a *allure.Context) {
+		a.Description("Exercises the first successful Wrap call before a duplicate Wrap attempt. " +
+			"The expected result is that the second Wrap call fails before running its body.")
+		a.Label("wrapCase", "duplicate-first")
+		a.Step("record first wrapped test evidence", func(a *allure.Context) {
+			a.Attachment("wrap payload", []byte("duplicate-first"), "text/plain")
+		})
+	}, allure.WithIDGenerator(probeIDs("wrap-duplicate-first")))
+
+	allure.Wrap(t, func(a *allure.Context) {
+		a.T().Fatalf("duplicate Wrap body should not run")
+	}, allure.WithIDGenerator(probeIDs("wrap-duplicate-second")))
+}
+
+func TestWrapAfterNamedTestFails(t *testing.T) {
+	allure.Test(t, "child", func(a *allure.Context) {
+		a.Description("Exercises a named child test before a conflicting Wrap attempt. " +
+			"The expected result is that the later Wrap call fails before running its body.")
+		a.Label("wrapCase", "named-first")
+		a.Step("record named child evidence", func(a *allure.Context) {
+			a.Attachment("wrap payload", []byte("named-first"), "text/plain")
+		})
+	}, allure.WithIDGenerator(probeIDs("wrap-named-first")))
+
+	allure.Wrap(t, func(a *allure.Context) {
+		a.T().Fatalf("Wrap after named Test body should not run")
+	}, allure.WithIDGenerator(probeIDs("wrap-after-named")))
+}
+
+func TestNamedChildInsideWrapFails(t *testing.T) {
+	allure.Wrap(t, func(a *allure.Context) {
+		a.Description("Exercises the strict same-test guard for Wrap. " +
+			"The expected result is that a named Allure child test cannot be created from the same wrapped *testing.T.")
+		a.Label("wrapCase", "named-child")
+		allure.Test(a.T(), "child", func(a *allure.Context) {
+			a.T().Fatalf("named child body should not run")
+		}, allure.WithIDGenerator(probeIDs("wrap-named-child-inner")))
+	}, allure.WithIDGenerator(probeIDs("wrap-named-child")))
+}
+
 func TestPlanAllureIDSelection(t *testing.T) {
 	allure.Test(t, "selected by static id", func(a *allure.Context) {
 		a.Description("Exercises gotest test-plan filtering with an Allure ID supplied as static metadata. " +

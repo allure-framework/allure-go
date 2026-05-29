@@ -10,7 +10,7 @@ import (
 )
 
 func TestMillisAndNowMillis(t *testing.T) {
-	allure.Test(t, "millisecond clock helpers return Unix milliseconds", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies the public clock helpers that adapters use for Allure timestamps. " +
 			"The expected result is that Millis converts a fixed time exactly and NowMillis returns a value inside the wall-clock interval observed by the test.")
 
@@ -36,7 +36,7 @@ func TestMillisAndNowMillis(t *testing.T) {
 }
 
 func TestNormalizeUsesDurationAndStop(t *testing.T) {
-	allure.Test(t, "normalizes timing from stop and duration", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies that clock.Normalize derives a start time from an explicit stop timestamp and duration when both are present. " +
 			"The expected result is a normalized window whose start is stop minus duration and whose stop remains the provided stop value.")
 
@@ -65,7 +65,7 @@ func TestNormalizeUsesDurationAndStop(t *testing.T) {
 }
 
 func TestNormalizeDefaultsMissingTimesToNow(t *testing.T) {
-	allure.Test(t, "defaults missing timing values to now", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies that clock.Normalize can fill missing start and stop values from the caller-provided current time. " +
 			"The expected result is a zero-duration window at now when no timing input is supplied.")
 
