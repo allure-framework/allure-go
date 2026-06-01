@@ -42,6 +42,20 @@ Use static `With...` options for metadata known before the body runs. They are a
 
 Each `allure.Test` call creates a Go subtest with `t.Run`, so failures, skips, logs, cleanup, steps, and attachments stay attached to the correct result.
 
+When a Go test function should produce exactly one Allure result, use `allure.Wrap` to report the current `*testing.T` without creating a named child:
+
+```go
+func TestLogin(t *testing.T) {
+	allure.Wrap(t, func(a *allure.Context) {
+		a.Step("submit credentials", func(a *allure.Context) {
+			a.Parameter("user", "alice")
+		})
+	})
+}
+```
+
+`allure.Wrap` uses `t.Name()` by default and rejects additional named `allure.Test` calls on the same `*testing.T`. Use `allure.Test` when one Go test should produce multiple named Allure results.
+
 By default, results are written to `./allure-results`. Set `ALLURE_RESULTS_DIR` to choose another directory.
 
 Set `ALLURE_LABEL_<NAME>` environment variables to add labels to every reported test in the run. Names are normalized to Allure-style lower camel case, so `ALLURE_LABEL_MODULE=commons` becomes `module=commons` and `ALLURE_LABEL_PARENT_SUITE=runtime` becomes `parentSuite=runtime`.

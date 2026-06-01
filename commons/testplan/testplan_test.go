@@ -11,7 +11,7 @@ import (
 )
 
 func TestIncludesMatchesByIDAndSelector(t *testing.T) {
-	allure.Test(t, "test plan includes matches by id and selector", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies the commons test-plan matching helper follows the reference matching algorithm. " +
 			"The expected result is inclusive OR matching by explicit Allure ID, tag-derived Allure ID, full name, and native selector while unrelated tests are excluded.")
 
@@ -54,7 +54,7 @@ func TestIncludesMatchesByIDAndSelector(t *testing.T) {
 }
 
 func TestLoadFromEnvHandlesUnavailablePlans(t *testing.T) {
-	allure.Test(t, "test plan loader handles unavailable plans", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies that the commons test-plan loader exposes unavailable plans without forcing adapters to fail a run. " +
 			"The expected result is nil for a missing ALLURE_TESTPLAN_PATH, successful loading for a valid file, and a returned error for unsupported versions.")
 
@@ -102,7 +102,7 @@ func TestLoadFromEnvHandlesUnavailablePlans(t *testing.T) {
 }
 
 func TestParseAndLoadFileHandlePlanEdgeCases(t *testing.T) {
-	allure.Test(t, "test plan parser and file loader handle edge cases", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies public test-plan helpers for empty plans, invalid JSON, numeric IDs, tag-derived IDs, and direct file loading. " +
 			"The expected result is that empty plans disable filtering, malformed content returns an error, numeric IDs match by their string form, unmatched tags return no id, and LoadFile delegates to Parse.")
 

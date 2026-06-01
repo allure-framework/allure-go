@@ -24,7 +24,7 @@ func (r *facadeRecorder) Handle(_ context.Context, message allureruntime.Message
 }
 
 func TestFacadeNoopsWithoutRuntime(t *testing.T) {
-	allure.Test(t, "facade calls no-op without runtime", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies that the public commons facade is safe to call with a plain context that has no active Allure runtime. " +
 			"The expected result is that metadata, attachments, explicit identifiers, and global artifacts are accepted without returning errors.")
 
@@ -149,7 +149,7 @@ func TestFacadeNoopsWithoutRuntime(t *testing.T) {
 }
 
 func TestFacadeEmitsRuntimeMessages(t *testing.T) {
-	allure.Test(t, "facade emits runtime messages", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies that the public commons facade translates each supported helper into the expected runtime message. " +
 			"The expected result is that metadata, attachments, global attachments, and global errors are emitted in order with copied in-memory payloads.")
 
@@ -268,7 +268,7 @@ func TestFacadeEmitsRuntimeMessages(t *testing.T) {
 }
 
 func TestFacadeConvenienceLabelsAndStepWrapper(t *testing.T) {
-	allure.Test(t, "facade convenience labels and step wrapper", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies the public facade helpers that are thin convenience APIs over runtime messages. " +
 			"The expected result is that canonical label helpers emit the correct label names and the Step wrapper emits start, metadata, and stop messages for both passed and broken bodies.")
 

@@ -51,45 +51,47 @@ func (t *recordingRequireT) Context() context.Context {
 }
 
 func TestRequireWrappersReportAllureSteps(t *testing.T) {
-	allure.Test(t, "testify require wrappers report Allure steps", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Runs passing and failing testify require proxies inside an isolated gotest result. " +
 			"The expected result is that each proxy call creates an Allure step, fluent requirements are included, and a failed requirement records its failed step before FailNow stops execution.")
 
 		memory := commonswriter.NewInMemoryWriter()
 
 		a.Step("run child test with require wrappers", func(a *allure.Context) {
-			allure.Test(a.T(), "require wrapper child", func(a *allure.Context) {
-				a.Step("exercise nested require calls", func(a *allure.Context) {
-					require.NoError(a, nil)
-					require.New(a).Len([]int{1, 2}, 2)
-					require.NoError(a.T(), nil)
+			a.T().Run("isolated require report", func(t *testing.T) {
+				allure.Test(t, "require wrapper child", func(a *allure.Context) {
+					a.Step("exercise nested require calls", func(a *allure.Context) {
+						require.NoError(a, nil)
+						require.New(a).Len([]int{1, 2}, 2)
+						require.NoError(a.T(), nil)
 
-					probe := &recordingRequireT{
-						ctx:  a.Context(),
-						name: "require-probe",
-						failNow: func() {
-							runtime.Goexit()
-						},
-					}
-					var continued atomic.Bool
-					done := make(chan struct{})
-					go func() {
-						defer close(done)
-						require.Equal(probe, "expected", "actual")
-						continued.Store(true)
-					}()
-					<-done
-					if continued.Load() {
-						a.T().Fatalf("expected failed requirement to stop execution")
-					}
-					if !probe.failedNow {
-						a.T().Fatalf("expected failed requirement to call FailNow")
-					}
-					if len(probe.errors) == 0 {
-						a.T().Fatalf("expected failing requirement output to be forwarded")
-					}
-				})
-			}, allure.WithWriter(memory))
+						probe := &recordingRequireT{
+							ctx:  a.Context(),
+							name: "require-probe",
+							failNow: func() {
+								runtime.Goexit()
+							},
+						}
+						var continued atomic.Bool
+						done := make(chan struct{})
+						go func() {
+							defer close(done)
+							require.Equal(probe, "expected", "actual")
+							continued.Store(true)
+						}()
+						<-done
+						if continued.Load() {
+							a.T().Fatalf("expected failed requirement to stop execution")
+						}
+						if !probe.failedNow {
+							a.T().Fatalf("expected failed requirement to call FailNow")
+						}
+						if len(probe.errors) == 0 {
+							a.T().Fatalf("expected failing requirement output to be forwarded")
+						}
+					})
+				}, allure.WithWriter(memory))
+			})
 		})
 
 		a.Step("verify require step evidence", func(a *allure.Context) {
@@ -116,7 +118,7 @@ func TestRequireWrappersReportAllureSteps(t *testing.T) {
 }
 
 func TestRequireWrapperAPIMatchesTestify(t *testing.T) {
-	allure.Test(t, "testify require wrapper API matches upstream", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Parses the pinned upstream testify require package and the local Allure require proxy package. " +
 			"The expected result is that every upstream public requirement function has both a package-level proxy and a fluent Assertions method.")
 

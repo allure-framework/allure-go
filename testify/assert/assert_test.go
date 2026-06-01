@@ -41,42 +41,44 @@ func (t *recordingTestingT) Context() context.Context {
 }
 
 func TestAssertWrappersReportAllureSteps(t *testing.T) {
-	allure.Test(t, "testify assert wrappers report Allure steps", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Runs passing and failing testify assert proxies inside an isolated gotest result. " +
 			"The expected result is that each proxy call creates an Allure step, fluent assertions are included, failure output is captured in status details, and calls without an Allure context keep normal testify behavior without reporting a step.")
 
 		memory := commonswriter.NewInMemoryWriter()
 
 		a.Step("run child test with assert wrappers", func(a *allure.Context) {
-			allure.Test(a.T(), "assert wrapper child", func(a *allure.Context) {
-				a.Step("exercise nested assert calls", func(a *allure.Context) {
-					if !assert.Equal(a, "same", "same") {
-						a.T().Fatalf("expected passing Equal assertion")
-					}
-					if !assert.New(a).Len([]int{1, 2}, 2) {
-						a.T().Fatalf("expected passing fluent Len assertion")
-					}
-					if !assert.Equal(a.T(), "plain testing.T", "plain testing.T") {
-						a.T().Fatalf("expected import-only assert call with testing.T to behave normally")
-					}
+			a.T().Run("isolated assert report", func(t *testing.T) {
+				allure.Test(t, "assert wrapper child", func(a *allure.Context) {
+					a.Step("exercise nested assert calls", func(a *allure.Context) {
+						if !assert.Equal(a, "same", "same") {
+							a.T().Fatalf("expected passing Equal assertion")
+						}
+						if !assert.New(a).Len([]int{1, 2}, 2) {
+							a.T().Fatalf("expected passing fluent Len assertion")
+						}
+						if !assert.Equal(a.T(), "plain testing.T", "plain testing.T") {
+							a.T().Fatalf("expected import-only assert call with testing.T to behave normally")
+						}
 
-					probe := &recordingTestingT{ctx: a.Context(), name: "assert-probe"}
-					if assert.Equal(probe, "expected", "actual") {
-						a.T().Fatalf("expected failing Equal assertion")
+						probe := &recordingTestingT{ctx: a.Context(), name: "assert-probe"}
+						if assert.Equal(probe, "expected", "actual") {
+							a.T().Fatalf("expected failing Equal assertion")
+						}
+						if len(probe.errors) == 0 {
+							a.T().Fatalf("expected failing assertion output to be forwarded")
+						}
+					})
+
+					probe := &recordingTestingT{name: "no-runtime"}
+					if assert.Equal(probe, 1, 2) {
+						a.T().Fatalf("expected no-runtime assertion to fail")
 					}
 					if len(probe.errors) == 0 {
-						a.T().Fatalf("expected failing assertion output to be forwarded")
+						a.T().Fatalf("expected no-runtime assertion output to be forwarded")
 					}
-				})
-
-				probe := &recordingTestingT{name: "no-runtime"}
-				if assert.Equal(probe, 1, 2) {
-					a.T().Fatalf("expected no-runtime assertion to fail")
-				}
-				if len(probe.errors) == 0 {
-					a.T().Fatalf("expected no-runtime assertion output to be forwarded")
-				}
-			}, allure.WithWriter(memory))
+				}, allure.WithWriter(memory))
+			})
 		})
 
 		a.Step("verify assert step evidence", func(a *allure.Context) {
@@ -103,7 +105,7 @@ func TestAssertWrappersReportAllureSteps(t *testing.T) {
 }
 
 func TestAssertWrapperAPIMatchesTestify(t *testing.T) {
-	allure.Test(t, "testify assert wrapper API matches upstream", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Parses the pinned upstream testify assert package and the local Allure assert proxy package. " +
 			"The expected result is that every upstream public assertion function has both a package-level proxy and a fluent Assertions method.")
 

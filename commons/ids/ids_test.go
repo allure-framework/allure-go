@@ -11,7 +11,7 @@ import (
 )
 
 func TestHashAndDerivedIDs(t *testing.T) {
-	allure.Test(t, "hash and derived id helpers are deterministic", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies the public id helpers that derive Allure test case and history identifiers. " +
 			"The expected result is deterministic MD5 output, empty input handling, and matching history ids whether the caller passes a test case id directly or derives it from a full name.")
 
@@ -51,7 +51,7 @@ func TestHashAndDerivedIDs(t *testing.T) {
 }
 
 func TestHistoryIDSortsAndExcludesParameters(t *testing.T) {
-	allure.Test(t, "history id sorts and excludes parameters", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies that HistoryID builds a stable identifier from included parameters only. " +
 			"The expected result is deterministic sorting by parameter name and exclusion of parameters marked excluded before the digest is appended.")
 
@@ -80,7 +80,7 @@ func TestHistoryIDSortsAndExcludesParameters(t *testing.T) {
 }
 
 func TestNewReturnsUUIDLikeValue(t *testing.T) {
-	allure.Test(t, "new id returns uuid-like value", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies that ids.New creates UUID-like identifiers for result files and lifecycle objects. " +
 			"The expected result is a 36-character version 4 UUID string.")
 

@@ -10,7 +10,7 @@ import (
 )
 
 func TestHandlerCoversFallbackAndPanicBranches(t *testing.T) {
-	allure.Test(t, "handler covers fallback and panic branches", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Exercises server middleware branches for a nil handler and a panicking handler. " +
 			"The expected result is a 404 exchange for the fallback handler and an exchange with panic details before the panic is rethrown.")
 

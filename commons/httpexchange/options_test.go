@@ -14,7 +14,7 @@ import (
 )
 
 func TestPublicConversionHelpersAndOptions(t *testing.T) {
-	allure.Test(t, "public conversion helpers and options", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Exercises the direct request/response conversion helpers and the public conversion options. " +
 			"The expected result is custom redaction, body truncation, binary body encoding, and nil input handling.")
 
@@ -98,7 +98,7 @@ func TestPublicConversionHelpersAndOptions(t *testing.T) {
 }
 
 func TestExchangeErrorOptionsAndMarshal(t *testing.T) {
-	allure.Test(t, "exchange error options and marshal", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Covers explicit and derived exchange errors plus direct JSON marshaling. " +
 			"The expected result is normalized schema v1 JSON and stable error fields.")
 
@@ -142,7 +142,7 @@ func TestExchangeErrorOptionsAndMarshal(t *testing.T) {
 }
 
 func TestAttachDefaultNames(t *testing.T) {
-	allure.Test(t, "attach default names", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Writes attachments without explicit names to cover default naming branches. " +
 			"The expected result is the generic name for missing methods and request-target names for root or unparsable URLs.")
 
@@ -185,7 +185,7 @@ var _ error = timeoutErr{}
 var _ interface{ Timeout() bool } = timeoutErr{}
 
 func TestWithErrorIgnoresNil(t *testing.T) {
-	allure.Test(t, "nil error option is ignored", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		exchange := httpexchange.NewExchange(
 			httptest.NewRequest(http.MethodGet, "https://api.example.test/v1/ok", nil),
 			nil,

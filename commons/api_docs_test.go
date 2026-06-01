@@ -15,7 +15,7 @@ import (
 )
 
 func TestPublicAPIDeclarationsHaveGoDocComments(t *testing.T) {
-	allure.Test(t, "public API declarations have Go doc comments", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Scans the commons module source with Go's parser and verifies every exported top-level declaration has an attached Go doc comment. " +
 			"The expected result is that types, constants, variables, functions, and methods visible in generated Go documentation are documented before release.")
 

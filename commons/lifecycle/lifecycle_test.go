@@ -11,7 +11,7 @@ import (
 )
 
 func TestHookFuncReceivesLifecycleEvents(t *testing.T) {
-	allure.Test(t, "lifecycle hook function receives events", func(a *allure.Context) {
+	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies that the commons lifecycle package exposes a small hook surface adapter authors can use without depending on a concrete lifecycle implementation. " +
 			"The expected result is that HookFunc receives a typed event carrying the test result model.")
 
