@@ -12,7 +12,8 @@ export default {
   plugins: {
     awesome: {
       options: {
-        groupBy: ["module", "titlePath"],
+        groupBy: ["module"],
+        appendTitlePath: true,
         publish: true,
       },
     },
