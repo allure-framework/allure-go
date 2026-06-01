@@ -48,7 +48,7 @@ type options struct {
 	historyID       string
 	testPlan        *testplan.Plan
 	testPlanErr     error
-	titlePathPrefix []string
+	titlePath       []string
 }
 
 // WithWriter writes this test's Allure artifacts through writer.
@@ -276,7 +276,7 @@ func Test(t *testing.T, name string, body func(*Context), opts ...Option) {
 	for _, opt := range opts {
 		opt(&cfg)
 	}
-	cfg.titlePathPrefix = callerTitlePathPrefix(1)
+	cfg.titlePath = callerTitlePath(1)
 
 	t.Run(name, func(t *testing.T) {
 		t.Helper()
@@ -298,7 +298,7 @@ func Wrap(t *testing.T, body func(*Context), opts ...Option) {
 	for _, opt := range opts {
 		opt(&cfg)
 	}
-	cfg.titlePathPrefix = callerTitlePathPrefix(1)
+	cfg.titlePath = callerTitlePath(1)
 
 	runTest(t, t.Name(), body, cfg)
 }
@@ -357,13 +357,14 @@ func runTest(t *testing.T, name string, body func(*Context), cfg options) {
 	t.Helper()
 
 	start := cfg.now()
+	titlePath := titlePath(cfg.titlePath)
 	result := model.TestResult{
 		UUID:         cfg.newID(),
 		Name:         name,
 		TestCaseName: name,
-		FullName:     t.Name(),
+		FullName:     fullName(titlePath, t.Name()),
 		Stage:        model.StageRunning,
-		TitlePath:    titlePath(cfg.titlePathPrefix, t.Name()),
+		TitlePath:    titlePath,
 		Labels: []model.Label{
 			{Name: "framework", Value: "go-test"},
 			{Name: "language", Value: "go"},
@@ -770,12 +771,12 @@ func envLabelName(name string) string {
 	return builder.String()
 }
 
-func splitTitlePath(fullName string) []string {
-	if fullName == "" {
+func splitNamePath(name string) []string {
+	if name == "" {
 		return nil
 	}
 
-	parts := strings.Split(fullName, "/")
+	parts := strings.Split(name, "/")
 	path := make([]string, 0, len(parts))
 	for _, part := range parts {
 		if part != "" {
@@ -786,17 +787,27 @@ func splitTitlePath(fullName string) []string {
 	return path
 }
 
-func titlePath(prefix []string, fullName string) []string {
-	testPath := splitTitlePath(fullName)
-	if len(prefix) == 0 {
-		return testPath
+func titlePath(path []string) []string {
+	if len(path) == 0 {
+		return nil
 	}
 
-	path := make([]string, 0, len(prefix)+len(testPath))
-	path = append(path, prefix...)
-	path = append(path, testPath...)
+	result := make([]string, 0, len(path))
+	for _, segment := range path {
+		if segment != "" {
+			result = append(result, segment)
+		}
+	}
 
-	return path
+	return result
+}
+
+func fullName(titlePath []string, testName string) string {
+	parts := make([]string, 0, len(titlePath)+1)
+	parts = append(parts, titlePath...)
+	parts = append(parts, splitNamePath(testName)...)
+
+	return strings.Join(parts, "/")
 }
 
 func suiteLabelsFromTitlePath(titlePath []string, explicitLabels []model.Label) []model.Label {
@@ -838,16 +849,16 @@ func hasExplicitLabel(labels []model.Label, name string) bool {
 	return false
 }
 
-func callerTitlePathPrefix(skip int) []string {
+func callerTitlePath(skip int) []string {
 	_, file, _, ok := runtime.Caller(skip + 1)
 	if !ok {
 		return nil
 	}
 
-	return fileTitlePathPrefix(file)
+	return fileTitlePath(file)
 }
 
-func fileTitlePathPrefix(file string) []string {
+func fileTitlePath(file string) []string {
 	if file == "" {
 		return nil
 	}
@@ -855,10 +866,10 @@ func fileTitlePathPrefix(file string) []string {
 	dir := filepath.Dir(file)
 	moduleDir := findModuleDir(dir)
 	if moduleDir == "" {
-		return cleanPathParts(filepath.Base(dir))
+		return cleanPathParts(filepath.Join(filepath.Base(dir), filepath.Base(file)))
 	}
 
-	relative, err := filepath.Rel(moduleDir, dir)
+	relative, err := filepath.Rel(moduleDir, file)
 	if err != nil || relative == "." {
 		return nil
 	}

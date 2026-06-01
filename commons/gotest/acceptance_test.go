@@ -145,9 +145,9 @@ func TestGotestSubtestsAndParallelIsolation(t *testing.T) {
 func TestGotestWrapReportsCurrentTest(t *testing.T) {
 	Wrap(t, func(a *Context) {
 		a.Description("Creates temporary Go projects whose tests use Wrap for one Go test to one Allure result. " +
-			"The expected result is that Wrap uses the current Go test name without duplicating the title path and rejects conflicting same-test helper usage.")
+			"The expected result is that Wrap uses the current Go test name with a module-relative file title path and rejects conflicting same-test helper usage.")
 
-		a.Step("verify Wrap reports current test without duplicate title path", func(a *Context) {
+		a.Step("verify Wrap reports current test with file title path", func(a *Context) {
 			run := runProbe(a, "^TestWrappedCurrentTest$", "", "", true, nil)
 
 			a.Step("verify wrapped current test process exit status", func(a *Context) {
@@ -231,7 +231,7 @@ func TestGotestTestPlanFiltering(t *testing.T) {
 		})
 
 		a.Step("select child test by full name", func(a *Context) {
-			planPath := writeProbeTestPlan(a, `{"version":"1.0","tests":[{"selector":"TestPlanFullNameSelection/selected-by-full-name"}]}`)
+			planPath := writeProbeTestPlan(a, `{"version":"1.0","tests":[{"selector":"probe_test.go/TestPlanFullNameSelection/selected-by-full-name"}]}`)
 			run := runProbe(a, "^TestPlanFullNameSelection$", "", "", true, map[string]string{
 				testplan.EnvPath: planPath,
 			}, planPath)
@@ -640,10 +640,10 @@ func assertStatusProbeResult(t *testing.T, result model.TestResult, mode string,
 	if result.TestCaseName != "logical "+mode {
 		t.Fatalf("unexpected test case name for %s: %q", mode, result.TestCaseName)
 	}
-	if !strings.Contains(result.FullName, "TestProbeStatus/probe_"+mode) {
+	if result.FullName != "probe_test.go/TestProbeStatus/probe_"+mode {
 		t.Fatalf("unexpected full name for %s: %q", mode, result.FullName)
 	}
-	if len(result.TitlePath) < 2 || result.TitlePath[0] != "TestProbeStatus" || !strings.Contains(result.TitlePath[len(result.TitlePath)-1], mode) {
+	if strings.Join(result.TitlePath, "\n") != "probe_test.go" {
 		t.Fatalf("unexpected title path for %s: %#v", mode, result.TitlePath)
 	}
 	if result.TestCaseID != "case-"+mode {
@@ -687,10 +687,10 @@ func assertWrappedProbeResult(t *testing.T, result model.TestResult) {
 	if result.TestCaseName != "TestWrappedCurrentTest" {
 		t.Fatalf("unexpected wrapped result test case name: %q", result.TestCaseName)
 	}
-	if result.FullName != "TestWrappedCurrentTest" {
+	if result.FullName != "probe_test.go/TestWrappedCurrentTest" {
 		t.Fatalf("unexpected wrapped result full name: %q", result.FullName)
 	}
-	if strings.Join(result.TitlePath, "\n") != "TestWrappedCurrentTest" {
+	if strings.Join(result.TitlePath, "\n") != "probe_test.go" {
 		t.Fatalf("unexpected wrapped result title path: %#v", result.TitlePath)
 	}
 	if !hasLabel(result.Labels, "framework", "go-test") || !hasLabel(result.Labels, "wrapCase", "current") {

@@ -102,7 +102,7 @@ func TestParallelIsolation(t *testing.T) {
 func TestWrappedCurrentTest(t *testing.T) {
 	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Exercises Wrap against the current Go test. " +
-			"The expected result is a single Allure result named after the Go test without an additional named subtest segment in the title path.")
+			"The expected result is a single Allure result named after the Go test with a module-relative file title path.")
 		a.Label("wrapCase", "current")
 		a.Step("record wrapped test evidence", func(a *allure.Context) {
 			a.Attachment("wrap payload", []byte("wrapped-current"), "text/plain")
