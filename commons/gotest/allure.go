@@ -439,7 +439,22 @@ func (a *Context) Helper() {
 // Errorf reports a formatted test failure on the underlying testing.T.
 func (a *Context) Errorf(format string, args ...interface{}) {
 	a.t.Helper()
+	a.recordStatusDetails(fmt.Sprintf(format, args...))
 	a.t.Errorf(format, args...)
+}
+
+// Fatal reports a test failure with Allure status details and stops execution.
+func (a *Context) Fatal(args ...interface{}) {
+	a.t.Helper()
+	a.recordStatusDetails(strings.TrimSuffix(fmt.Sprintln(args...), "\n"))
+	a.t.Fatal(args...)
+}
+
+// Fatalf reports a formatted test failure with Allure status details and stops execution.
+func (a *Context) Fatalf(format string, args ...interface{}) {
+	a.t.Helper()
+	a.recordStatusDetails(fmt.Sprintf(format, args...))
+	a.t.Fatalf(format, args...)
 }
 
 // FailNow marks the test failed and stops execution on the underlying testing.T.
@@ -456,6 +471,14 @@ func (a *Context) Name() string {
 // Context returns the context carrying the active Allure runtime state.
 func (a *Context) Context() context.Context {
 	return a.ctx
+}
+
+func (a *Context) recordStatusDetails(message string) {
+	if a.runtime == nil || message == "" {
+		return
+	}
+
+	a.runtime.recordStatusDetails(&model.StatusDetails{Message: message})
 }
 
 // Step reports body as an Allure step.
@@ -980,7 +1003,9 @@ func (r *testRuntime) finish(status model.Status, details *model.StatusDetails) 
 	}
 
 	r.result.Status = status
-	r.result.StatusDetails = details
+	if details != nil || r.result.StatusDetails == nil {
+		r.result.StatusDetails = details
+	}
 	r.result.Stage = model.StageFinished
 	r.result.Stop = stop
 	if r.result.TestCaseID == "" {
@@ -1018,6 +1043,27 @@ func (r *testRuntime) applyMetadata(metadata *allureruntime.Metadata) {
 	}
 	if metadata.HistoryID != "" {
 		r.result.HistoryID = metadata.HistoryID
+	}
+}
+
+func (r *testRuntime) recordStatusDetails(details *model.StatusDetails) {
+	if details == nil {
+		return
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.result.StatusDetails == nil {
+		r.result.StatusDetails = cloneStatusDetails(details)
+	}
+	if len(r.steps) == 0 {
+		return
+	}
+
+	step := r.steps[len(r.steps)-1]
+	if step.StatusDetails == nil {
+		step.StatusDetails = cloneStatusDetails(details)
 	}
 }
 
@@ -1084,9 +1130,20 @@ func (r *testRuntime) stopStep(message allureruntime.Message) {
 	}
 
 	step.Status = status
-	step.StatusDetails = message.StepStop.StatusDetails
+	if message.StepStop.StatusDetails != nil || step.StatusDetails == nil {
+		step.StatusDetails = message.StepStop.StatusDetails
+	}
 	step.Stage = model.StageFinished
 	step.Stop = stop
+}
+
+func cloneStatusDetails(details *model.StatusDetails) *model.StatusDetails {
+	if details == nil {
+		return nil
+	}
+
+	cloned := *details
+	return &cloned
 }
 
 func (r *testRuntime) appendStep(step model.StepResult) {

@@ -55,8 +55,8 @@ func TestProbeStatus(t *testing.T) {
 			case "passed":
 				a.Attachment("status evidence", []byte("passed"), "text/plain")
 			case "failed":
-				a.Attachment("status evidence", []byte("failed by Errorf"), "text/plain")
-				a.T().Errorf("probe failed intentionally")
+				a.Attachment("status evidence", []byte("failed by Fatalf"), "text/plain")
+				a.Fatalf("probe failed intentionally")
 			case "broken":
 				a.Attachment("status evidence", []byte("broken by panic"), "text/plain")
 				panic("probe panicked intentionally")

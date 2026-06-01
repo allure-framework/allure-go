@@ -673,6 +673,14 @@ func assertStatusProbeResult(t *testing.T, result model.TestResult, mode string,
 	if result.Steps[1].Status != status {
 		t.Fatalf("unexpected final step status for %s: %s", mode, result.Steps[1].Status)
 	}
+	if mode == "failed" {
+		if result.StatusDetails == nil || result.StatusDetails.Message != "probe failed intentionally" {
+			t.Fatalf("missing failed result status details: %#v", result.StatusDetails)
+		}
+		if result.Steps[1].StatusDetails == nil || result.Steps[1].StatusDetails.Message != "probe failed intentionally" {
+			t.Fatalf("missing failed step status details: %#v", result.Steps[1].StatusDetails)
+		}
+	}
 }
 
 func assertWrappedProbeResult(t *testing.T, result model.TestResult) {
@@ -745,7 +753,7 @@ func assertProbeAttachments(t *testing.T, run probeRun, mode string) {
 func statusEvidence(mode string) string {
 	switch mode {
 	case "failed":
-		return "failed by Errorf"
+		return "failed by Fatalf"
 	case "broken":
 		return "broken by panic"
 	case "skipped":

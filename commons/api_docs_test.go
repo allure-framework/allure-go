@@ -21,7 +21,7 @@ func TestPublicAPIDeclarationsHaveGoDocComments(t *testing.T) {
 
 		root, err := os.Getwd()
 		if err != nil {
-			a.T().Fatalf("get working directory: %v", err)
+			a.Fatalf("get working directory: %v", err)
 		}
 
 		var scannedFiles []string
@@ -55,7 +55,7 @@ func TestPublicAPIDeclarationsHaveGoDocComments(t *testing.T) {
 				return nil
 			})
 			if err != nil {
-				a.T().Fatalf("walk source files: %v", err)
+				a.Fatalf("walk source files: %v", err)
 			}
 
 			sort.Strings(scannedFiles)
@@ -69,7 +69,7 @@ func TestPublicAPIDeclarationsHaveGoDocComments(t *testing.T) {
 		a.Step("verify every exported declaration is documented", func(a *allure.Context) {
 			a.Attachment("verification scope", []byte("source files: "+countString(scannedFiles)+"\nexported declarations: "+countString(declarations)), "text/plain")
 			if len(missing) > 0 {
-				a.T().Fatalf("missing Go doc comments:\n%s", strings.Join(missing, "\n"))
+				a.Fatalf("missing Go doc comments:\n%s", strings.Join(missing, "\n"))
 			}
 		})
 	})
