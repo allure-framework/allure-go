@@ -353,7 +353,7 @@ func TestContentAttachmentsUseAllureJSExtensions(t *testing.T) {
 func TestTitlePathIncludesPackageFolders(t *testing.T) {
 	Test(t, "title path includes package folders", func(a *Context) {
 		a.Description("Runs a child gotest report through an isolated in-memory writer from the commons/gotest package. " +
-			"The expected result is that the generated Allure title path starts with package folder names relative to the current module before the Go test and subtest hierarchy, and the default suite labels follow the same path.")
+			"The expected result is that the generated Allure title path contains the module-relative test file path, while the full name appends the Go test name to that stable file path.")
 
 		memory := commonswriter.NewInMemoryWriter()
 
@@ -372,21 +372,25 @@ func TestTitlePathIncludesPackageFolders(t *testing.T) {
 				a.T().Fatalf("expected one child result, got %d", len(snapshot.Results))
 			}
 
-			got := snapshot.Results[0].TitlePath
-			want := []string{"gotest", "TestTitlePathIncludesPackageFolders", "title_path_includes_package_folders", "package_path_child"}
-			a.Attachment("observed title path", []byte(strings.Join(got, "\n")), "text/plain")
-			a.Attachment("expected title path", []byte(strings.Join(want, "\n")), "text/plain")
-			if strings.Join(got, "\n") != strings.Join(want, "\n") {
-				a.T().Fatalf("unexpected title path\nwant: %#v\n got: %#v", want, got)
+			result := snapshot.Results[0]
+			gotTitlePath := result.TitlePath
+			wantTitlePath := []string{"gotest", "allure_test.go"}
+			a.Attachment("observed title path", []byte(strings.Join(gotTitlePath, "\n")), "text/plain")
+			a.Attachment("expected title path", []byte(strings.Join(wantTitlePath, "\n")), "text/plain")
+			if strings.Join(gotTitlePath, "\n") != strings.Join(wantTitlePath, "\n") {
+				a.T().Fatalf("unexpected title path\nwant: %#v\n got: %#v", wantTitlePath, gotTitlePath)
 			}
-			if !hasLabel(snapshot.Results[0].Labels, labelParentSuite, "gotest") {
-				a.T().Fatalf("missing generated parentSuite label: %#v", snapshot.Results[0].Labels)
+			wantFullName := "gotest/allure_test.go/TestTitlePathIncludesPackageFolders/title_path_includes_package_folders/package_path_child"
+			a.Attachment("observed full name", []byte(result.FullName), "text/plain")
+			a.Attachment("expected full name", []byte(wantFullName), "text/plain")
+			if result.FullName != wantFullName {
+				a.T().Fatalf("unexpected full name\nwant: %q\n got: %q", wantFullName, result.FullName)
 			}
-			if !hasLabel(snapshot.Results[0].Labels, labelSuite, "TestTitlePathIncludesPackageFolders") {
-				a.T().Fatalf("missing generated suite label: %#v", snapshot.Results[0].Labels)
+			if !hasLabel(result.Labels, labelParentSuite, "gotest") {
+				a.T().Fatalf("missing generated parentSuite label: %#v", result.Labels)
 			}
-			if !hasLabel(snapshot.Results[0].Labels, labelSubSuite, "title_path_includes_package_folders > package_path_child") {
-				a.T().Fatalf("missing generated subSuite label: %#v", snapshot.Results[0].Labels)
+			if !hasLabel(result.Labels, labelSuite, "allure_test.go") {
+				a.T().Fatalf("missing generated suite label: %#v", result.Labels)
 			}
 		})
 	})
