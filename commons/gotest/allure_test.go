@@ -489,6 +489,111 @@ func TestExplicitSuiteLabelsOverrideGeneratedTitlePathLabels(t *testing.T) {
 	})
 }
 
+func TestAnyExplicitSuiteHierarchyLabelSuppressesGeneratedTitlePathLabels(t *testing.T) {
+	Wrap(t, func(a *Context) {
+		a.Description("Verifies that any explicit suite hierarchy label overrides the defaults derived from titlePath. " +
+			"The expected result is that no generated parentSuite, suite, or subSuite label is added when only one suite hierarchy label is explicit.")
+
+		titlePath := []string{"commons", "gotest", "TestName"}
+		cases := []struct {
+			name     string
+			explicit []model.Label
+		}{
+			{
+				name:     "parent suite",
+				explicit: []model.Label{{Name: labelParentSuite, Value: "custom parent"}},
+			},
+			{
+				name:     "suite",
+				explicit: []model.Label{{Name: labelSuite, Value: "custom suite"}},
+			},
+			{
+				name:     "sub suite",
+				explicit: []model.Label{{Name: labelSubSuite, Value: "custom sub"}},
+			},
+		}
+
+		for _, tc := range cases {
+			tc := tc
+			a.Step("derive suite labels with explicit "+tc.name, func(a *Context) {
+				generated := suiteLabelsFromTitlePath(titlePath, tc.explicit)
+				a.Attachment("title path", []byte(strings.Join(titlePath, "\n")), "text/plain")
+				a.Attachment("explicit suite labels", []byte(labelsEvidence(tc.explicit)), "text/plain")
+				a.Attachment("generated suite labels", []byte(labelsEvidence(generated)), "text/plain")
+				assertLabelsExact(a, generated, nil)
+			})
+		}
+	})
+}
+
+func TestSuiteHierarchyOverridesSuppressGeneratedResultLabels(t *testing.T) {
+	Test(t, "suite hierarchy overrides suppress generated result labels", func(a *Context) {
+		a.Description("Runs child gotest reports with static and runtime suite overrides. " +
+			"The expected result is that each child keeps only the explicit suite hierarchy label and does not mix it with generated parentSuite or subSuite labels.")
+
+		memory := commonswriter.NewInMemoryWriter()
+		scenarios := []struct {
+			id    string
+			name  string
+			suite string
+			opts  []Option
+			body  func(*Context)
+		}{
+			{
+				id:    "static-suite",
+				name:  "static suite override child",
+				suite: "custom static",
+				opts:  []Option{WithSuite("custom static")},
+			},
+			{
+				id:    "runtime-suite",
+				name:  "runtime suite override child",
+				suite: "custom runtime",
+				body: func(a *Context) {
+					a.Label(labelSuite, "custom runtime")
+				},
+			},
+		}
+
+		for _, scenario := range scenarios {
+			scenario := scenario
+			a.Step("run "+scenario.name, func(a *Context) {
+				opts := []Option{
+					WithWriter(memory),
+					WithIDGenerator(fixedIDs(scenario.id+"-result", scenario.id+"-attachment")),
+				}
+				opts = append(opts, scenario.opts...)
+
+				Test(a.T(), scenario.name, func(a *Context) {
+					if scenario.body != nil {
+						scenario.body(a)
+					}
+					a.Attachment("suite override evidence", []byte("suite="+scenario.suite), "text/plain")
+				}, opts...)
+			})
+		}
+
+		a.Step("verify generated suite hierarchy labels are suppressed", func(a *Context) {
+			snapshot := memory.Snapshot()
+			a.Attachment("generated suite override artifacts", []byte(snapshotEvidence(snapshot, nil)), "text/plain")
+			if len(snapshot.Results) != len(scenarios) {
+				a.T().Fatalf("expected %d child results, got %d", len(scenarios), len(snapshot.Results))
+			}
+
+			for _, scenario := range scenarios {
+				result, ok := findResultByName(snapshot.Results, scenario.name)
+				if !ok {
+					a.T().Fatalf("missing result %q: %#v", scenario.name, snapshot.Results)
+				}
+
+				assertLabelsExact(a, suiteHierarchyLabels(result.Labels), []model.Label{
+					{Name: labelSuite, Value: scenario.suite},
+				})
+			}
+		})
+	})
+}
+
 func TestLabelsFromEnv(t *testing.T) {
 	Wrap(t, func(a *Context) {
 		a.Description("Verifies that gotest can read module-level labels from environment variables. " +
@@ -527,6 +632,27 @@ func hasLabel(labels []model.Label, name string, value string) bool {
 		}
 	}
 	return false
+}
+
+func findResultByName(results []model.TestResult, name string) (model.TestResult, bool) {
+	for _, result := range results {
+		if result.Name == name {
+			return result, true
+		}
+	}
+
+	return model.TestResult{}, false
+}
+
+func suiteHierarchyLabels(labels []model.Label) []model.Label {
+	filtered := make([]model.Label, 0, 3)
+	for _, label := range labels {
+		if isSuiteHierarchyLabel(label.Name) {
+			filtered = append(filtered, label)
+		}
+	}
+
+	return filtered
 }
 
 func assertLabelsExact(a *Context, got []model.Label, want []model.Label) {

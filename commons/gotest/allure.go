@@ -371,7 +371,6 @@ func runTest(t *testing.T, name string, body func(*Context), cfg options) {
 		},
 		Start: start,
 	}
-	result.Labels = append(result.Labels, suiteLabelsFromTitlePath(result.TitlePath, cfg.labels)...)
 	applyStaticMetadata(&result, cfg)
 
 	if cfg.testPlanErr != nil {
@@ -855,21 +854,25 @@ func suiteLabelsFromTitlePath(titlePath []string, explicitLabels []model.Label) 
 }
 
 func appendSuiteLabel(labels []model.Label, explicitLabels []model.Label, name string, value string) []model.Label {
-	if value == "" || hasExplicitLabel(explicitLabels, name) {
+	if value == "" || hasSuiteHierarchyLabel(explicitLabels) {
 		return labels
 	}
 
 	return append(labels, model.Label{Name: name, Value: value})
 }
 
-func hasExplicitLabel(labels []model.Label, name string) bool {
+func hasSuiteHierarchyLabel(labels []model.Label) bool {
 	for _, label := range labels {
-		if label.Name == name {
+		if isSuiteHierarchyLabel(label.Name) {
 			return true
 		}
 	}
 
 	return false
+}
+
+func isSuiteHierarchyLabel(name string) bool {
+	return name == labelParentSuite || name == labelSuite || name == labelSubSuite
 }
 
 func callerTitlePath(skip int) []string {
@@ -1008,6 +1011,7 @@ func (r *testRuntime) finish(status model.Status, details *model.StatusDetails) 
 	}
 	r.result.Stage = model.StageFinished
 	r.result.Stop = stop
+	r.applyGeneratedSuiteLabels()
 	if r.result.TestCaseID == "" {
 		r.result.TestCaseID = ids.TestCaseID(r.result.FullName)
 	}
@@ -1016,6 +1020,14 @@ func (r *testRuntime) finish(status model.Status, details *model.StatusDetails) 
 	}
 
 	return r.writer.WriteResult(context.Background(), *r.result)
+}
+
+func (r *testRuntime) applyGeneratedSuiteLabels() {
+	if hasSuiteHierarchyLabel(r.result.Labels) {
+		return
+	}
+
+	r.result.Labels = append(r.result.Labels, suiteLabelsFromTitlePath(r.result.TitlePath, r.result.Labels)...)
 }
 
 func (r *testRuntime) applyMetadata(metadata *allureruntime.Metadata) {
