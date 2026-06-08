@@ -67,6 +67,14 @@ jobs:
         run: |
           go vet ./...
 
+      - name: Lint
+        working-directory: ${{ matrix.module }}
+        run: |
+          go run github.com/mgechev/revive@v1.15.0 \
+            -config "${GITHUB_WORKSPACE}/revive.toml" \
+            -set_exit_status \
+            ./...
+
       - name: Tidy check
         working-directory: ${{ matrix.module }}
         run: |

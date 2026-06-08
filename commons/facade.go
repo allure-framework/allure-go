@@ -28,6 +28,7 @@ type ParameterOptions struct {
 // Framework integrations should implement this interface on their test context
 // type when helper libraries need to report to the current Allure test or step.
 type ContextProvider interface {
+	// Context returns the Go context carrying active Allure runtime state.
 	Context() context.Context
 }
 

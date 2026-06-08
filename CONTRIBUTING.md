@@ -26,7 +26,16 @@ go work sync
 Run checks from each module listed in `go.work`:
 
 ```bash
-(cd commons && gofmt -w . && go vet ./... && go test -count=1 ./...)
+for module in commons testify; do
+  (
+    cd "${module}" &&
+      gofmt -w . &&
+      go vet ./... &&
+      go run github.com/mgechev/revive@v1.15.0 -config ../revive.toml -set_exit_status \
+        ./... &&
+      go test -count=1 ./...
+  )
+done
 ```
 
 Before submitting a pull request, make sure `go mod tidy` does not leave changes:
@@ -52,4 +61,3 @@ Pull requests should include:
 - any release-note worthy compatibility notes
 
 Small, focused pull requests are easier to review than broad refactors mixed with behavior changes.
-

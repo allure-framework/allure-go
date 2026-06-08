@@ -109,6 +109,16 @@ jobs:
             (cd "${module_dir}" && go vet ./...)
           done < .release-modules
 
+      - name: Lint
+        shell: bash
+        run: |
+          while IFS= read -r module_dir || [ -n "${module_dir}" ]; do
+            (cd "${module_dir}" && go run github.com/mgechev/revive@v1.15.0 \
+              -config "${GITHUB_WORKSPACE}/revive.toml" \
+              -set_exit_status \
+              ./...)
+          done < .release-modules
+
       - name: Test
         shell: bash
         run: |

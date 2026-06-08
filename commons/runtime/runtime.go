@@ -121,6 +121,7 @@ type GlobalAttachmentPath struct {
 
 // Runtime handles emitted Allure runtime messages.
 type Runtime interface {
+	// Handle handles one emitted Allure runtime message.
 	Handle(context.Context, Message) error
 }
 
