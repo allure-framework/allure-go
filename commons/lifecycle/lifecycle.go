@@ -183,6 +183,7 @@ type Event struct {
 
 // Hook observes lifecycle events.
 type Hook interface {
+	// HandleLifecycleEvent handles one lifecycle event.
 	HandleLifecycleEvent(context.Context, Event) error
 }
 

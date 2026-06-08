@@ -1,0 +1,38 @@
+severity = "warning"
+confidence = 0.8
+errorCode = 1
+warningCode = 1
+
+[rule.exported]
+arguments = [
+  "checkPublicInterface",
+  "disableStutteringCheck",
+]
+Exclude = [
+  "**/allure-results/**",
+  "**/allure-report/**",
+]
+
+[rule.blank-imports]
+
+[rule.dot-imports]
+
+[rule.duplicated-imports]
+
+[rule.error-return]
+
+[rule.error-naming]
+
+[rule.errorf]
+
+[rule.context-as-argument]
+
+[rule.context-keys-type]
+
+[rule.range]
+
+[rule.unreachable-code]
+
+[rule.redefines-builtin-id]
+
+[rule.package-comments]

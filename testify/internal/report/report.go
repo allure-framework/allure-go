@@ -39,12 +39,15 @@ type Argument struct {
 
 // AssertT is the TestingT shape used by assert-style wrappers.
 type AssertT interface {
+	// Errorf reports a formatted assertion failure.
 	Errorf(format string, args ...interface{})
 }
 
 // RequireT is the TestingT shape used by require-style wrappers.
 type RequireT interface {
+	// Errorf reports a formatted assertion failure.
 	Errorf(format string, args ...interface{})
+	// FailNow stops the current test after a required assertion fails.
 	FailNow()
 }
 
