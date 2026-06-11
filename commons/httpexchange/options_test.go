@@ -50,6 +50,7 @@ func TestPublicConversionHelpersAndOptions(t *testing.T) {
 			if len(request.Cookies) != 1 || request.Cookies[0].Value != httpexchange.RedactedValue {
 				a.T().Fatalf("cookie was not redacted: %#v", request.Cookies)
 			}
+			requirePayloadOmits(a.T(), payload, "custom_token=secret", "header-secret", "custom_cookie=secret", "pin=1234")
 		})
 
 		a.Step("convert response with body limit and binary encoding", func(a *allure.Context) {
@@ -84,6 +85,7 @@ func TestPublicConversionHelpersAndOptions(t *testing.T) {
 			if response.Body.Size != 4 || !response.Body.Truncated {
 				a.T().Fatalf("unexpected body size metadata: %#v", response.Body)
 			}
+			requirePayloadOmits(a.T(), payload, "response-secret")
 		})
 
 		a.Step("handle nil conversion inputs", func(a *allure.Context) {

@@ -2,6 +2,7 @@ package ids_test
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -9,6 +10,8 @@ import (
 	"github.com/allure-framework/allure-go/commons/ids"
 	"github.com/allure-framework/allure-go/commons/model"
 )
+
+var uuidV4Pattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
 func TestHashAndDerivedIDs(t *testing.T) {
 	allure.Wrap(t, func(a *allure.Context) {
@@ -82,7 +85,7 @@ func TestHistoryIDSortsAndExcludesParameters(t *testing.T) {
 func TestNewReturnsUUIDLikeValue(t *testing.T) {
 	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Verifies that ids.New creates UUID-like identifiers for result files and lifecycle objects. " +
-			"The expected result is a 36-character version 4 UUID string.")
+			"The expected result is a lowercase RFC 4122 version 4 UUID string with canonical hyphen placement and variant bits.")
 
 		var got string
 		a.Step("generate a new id", func(a *allure.Context) {
@@ -94,13 +97,13 @@ func TestNewReturnsUUIDLikeValue(t *testing.T) {
 			a.Attachment("generated id", []byte(fmt.Sprintf("id: %s\nlength: %d\nversion character: %c", got, len(got), version)), "text/plain")
 		})
 
-		a.Step("verify uuid-like shape", func(a *allure.Context) {
-			a.Attachment("expected uuid shape", []byte("length: 36\nversion character at index 14: 4"), "text/plain")
+		a.Step("verify RFC 4122 version 4 UUID shape", func(a *allure.Context) {
+			a.Attachment("expected uuid shape", []byte(uuidV4Pattern.String()), "text/plain")
 			if len(got) != 36 {
 				a.T().Fatalf("unexpected uuid length: %q", got)
 			}
-			if got[14] != '4' {
-				a.T().Fatalf("expected version 4 uuid, got %q", got)
+			if !uuidV4Pattern.MatchString(got) {
+				a.T().Fatalf("expected RFC 4122 version 4 UUID, got %q", got)
 			}
 		})
 	})
