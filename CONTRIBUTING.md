@@ -49,7 +49,7 @@ git diff --exit-code
 
 Add or update tests for behavior changes. Tests in this repository should produce useful Allure runtime evidence: clear descriptions, meaningful steps, and attachments that show the setup, action, and verification when that evidence helps review the result.
 
-When running tests for review or debugging in this repository, follow `docs/allure-agent-mode.md`.
+For test-related agent work, follow `docs/allure-test-agent.md`.
 
 ## Pull Requests
 
