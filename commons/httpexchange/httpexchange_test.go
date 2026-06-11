@@ -36,6 +36,7 @@ func TestNewExchangeConvertsHTTPValues(t *testing.T) {
 		}
 
 		var exchange httpexchange.Exchange
+		var payload []byte
 		a.Step("construct exchange from request and response", func(a *allure.Context) {
 			exchange = httpexchange.NewExchange(
 				req,
@@ -44,7 +45,8 @@ func TestNewExchangeConvertsHTTPValues(t *testing.T) {
 				[]byte(`{"id":42}`),
 				httpexchange.WithStartStop(1000, 1050),
 			)
-			payload, err := httpexchange.Marshal(exchange)
+			var err error
+			payload, err = httpexchange.Marshal(exchange)
 			if err != nil {
 				a.T().Fatalf("marshal exchange: %v", err)
 			}
@@ -86,6 +88,7 @@ func TestNewExchangeConvertsHTTPValues(t *testing.T) {
 			if len(exchange.Response.Cookies) != 1 || exchange.Response.Cookies[0].SameSite != "Lax" || exchange.Response.Cookies[0].Value != httpexchange.RedactedValue {
 				a.T().Fatalf("response cookie was not converted: %#v", exchange.Response.Cookies)
 			}
+			requirePayloadOmits(a.T(), payload, "token=secret", "Bearer secret", "password=pw", "sid=secret")
 		})
 	})
 }
@@ -187,6 +190,7 @@ func TestHandlerCapturesHttptestServerExchange(t *testing.T) {
 				a.T().Fatalf("request URL was not redacted: %q", exchange.Request.URL)
 			}
 			requirePair(a.T(), exchange.Request.Headers, "Authorization", httpexchange.RedactedValue)
+			requirePayloadOmits(a.T(), attachmentPayload(a.T(), results, "server exchange"), "token=secret", "Bearer secret")
 			if exchange.Request.Body == nil || exchange.Request.Body.Value != `{"name":"demo"}` {
 				a.T().Fatalf("request body was not captured: %#v", exchange.Request.Body)
 			}
@@ -250,6 +254,7 @@ func TestTransportCapturesClientExchange(t *testing.T) {
 			if !strings.Contains(exchange.Request.URL, "api_key=__ALLURE_REDACTED__") {
 				a.T().Fatalf("request URL was not redacted: %q", exchange.Request.URL)
 			}
+			requirePayloadOmits(a.T(), attachmentPayload(a.T(), results, "client exchange"), "api_key=secret")
 			if exchange.Request.Body == nil || exchange.Request.Body.Value != `{"displayName":"Demo"}` {
 				a.T().Fatalf("request body was not captured: %#v", exchange.Request.Body)
 			}
@@ -288,6 +293,17 @@ func requirePair(t *testing.T, pairs []httpexchange.NameValue, name string, valu
 		}
 	}
 	t.Fatalf("missing pair %s=%s in %#v", name, value, pairs)
+}
+
+func requirePayloadOmits(t *testing.T, payload []byte, forbidden ...string) {
+	t.Helper()
+
+	text := string(payload)
+	for _, value := range forbidden {
+		if strings.Contains(text, value) {
+			t.Fatalf("HTTP exchange payload leaked %q:\n%s", value, payload)
+		}
+	}
 }
 
 func attachHTTPExchangeEvidence(a *allure.Context, snapshot AllureResults, name string) httpexchange.Exchange {

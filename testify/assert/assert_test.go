@@ -1,10 +1,12 @@
 package assert_test
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"go/ast"
 	"go/parser"
+	"go/printer"
 	"go/token"
 	"os"
 	"os/exec"
@@ -107,26 +109,29 @@ func TestAssertWrappersReportAllureSteps(t *testing.T) {
 func TestAssertWrapperAPIMatchesTestify(t *testing.T) {
 	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Parses the pinned upstream testify assert package and the local Allure assert proxy package. " +
-			"The expected result is that every upstream public assertion function has both a package-level proxy and a fluent Assertions method.")
+			"The expected result is that every upstream public assertion function has both a signature-compatible package-level proxy and a signature-compatible fluent Assertions method.")
 
-		var upstreamNames []string
-		var localFunctions []string
-		var localMethods []string
+		var upstreamFunctions []apiSignature
+		var localFunctions []apiSignature
+		var upstreamMethods []apiSignature
+		var localMethods []apiSignature
 
 		a.Step("parse upstream and local assert APIs", func(a *allure.Context) {
 			upstreamDir := filepath.Join(testifyModuleDir(a.T()), "assert")
 			localDir := currentPackageDir(a.T())
-			upstreamNames = exportedAssertionFunctions(a.T(), upstreamDir, true)
+			upstreamFunctions = exportedAssertionFunctions(a.T(), upstreamDir, true)
 			localFunctions = exportedAssertionFunctions(a.T(), localDir, true)
+			upstreamMethods = fluentMethodSignatures(a.T(), upstreamFunctions)
 			localMethods = exportedAssertionMethods(a.T(), localDir)
-			a.Attachment("upstream assert functions", []byte(strings.Join(upstreamNames, "\n")), "text/plain")
-			a.Attachment("local assert functions", []byte(strings.Join(localFunctions, "\n")), "text/plain")
-			a.Attachment("local assert methods", []byte(strings.Join(localMethods, "\n")), "text/plain")
+			a.Attachment("upstream assert functions", []byte(formatSignatures(upstreamFunctions)), "text/plain")
+			a.Attachment("local assert functions", []byte(formatSignatures(localFunctions)), "text/plain")
+			a.Attachment("expected assert methods", []byte(formatSignatures(upstreamMethods)), "text/plain")
+			a.Attachment("local assert methods", []byte(formatSignatures(localMethods)), "text/plain")
 		})
 
-		a.Step("verify assert proxy API coverage", func(a *allure.Context) {
-			assertNameSetEqual(a, localFunctions, upstreamNames, "package-level assert functions")
-			assertNameSetEqual(a, localMethods, upstreamNames, "fluent assert methods")
+		a.Step("verify assert proxy API compatibility", func(a *allure.Context) {
+			assertSignatureSetEqual(a, localFunctions, upstreamFunctions, "package-level assert functions")
+			assertSignatureSetEqual(a, localMethods, upstreamMethods, "fluent assert methods")
 		})
 	})
 }
@@ -202,10 +207,28 @@ func currentPackageDir(t *testing.T) string {
 	return filepath.Dir(file)
 }
 
-func exportedAssertionFunctions(t *testing.T, dir string, returnsBool bool) []string {
+type apiSignature struct {
+	Name    string
+	Params  []string
+	Results []string
+}
+
+func (signature apiSignature) String() string {
+	result := signature.Name + "(" + strings.Join(signature.Params, ", ") + ")"
+	switch len(signature.Results) {
+	case 0:
+		return result
+	case 1:
+		return result + " " + signature.Results[0]
+	default:
+		return result + " (" + strings.Join(signature.Results, ", ") + ")"
+	}
+}
+
+func exportedAssertionFunctions(t *testing.T, dir string, returnsBool bool) []apiSignature {
 	t.Helper()
 
-	var names []string
+	var signatures []apiSignature
 	for _, file := range parseGoFiles(t, dir) {
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
@@ -221,17 +244,17 @@ func exportedAssertionFunctions(t *testing.T, dir string, returnsBool bool) []st
 			if !returnsBool && resultCount(fn.Type.Results) != 0 {
 				continue
 			}
-			names = append(names, fn.Name.Name)
+			signatures = append(signatures, functionSignature(t, fn))
 		}
 	}
-	sort.Strings(names)
-	return names
+	sortSignatures(signatures)
+	return signatures
 }
 
-func exportedAssertionMethods(t *testing.T, dir string) []string {
+func exportedAssertionMethods(t *testing.T, dir string) []apiSignature {
 	t.Helper()
 
-	var names []string
+	var signatures []apiSignature
 	for _, file := range parseGoFiles(t, dir) {
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
@@ -239,12 +262,12 @@ func exportedAssertionMethods(t *testing.T, dir string) []string {
 				continue
 			}
 			if receiverName(fn.Recv.List[0].Type) == "Assertions" {
-				names = append(names, fn.Name.Name)
+				signatures = append(signatures, functionSignature(t, fn))
 			}
 		}
 	}
-	sort.Strings(names)
-	return names
+	sortSignatures(signatures)
+	return signatures
 }
 
 func parseGoFiles(t *testing.T, dir string) []*ast.File {
@@ -297,6 +320,85 @@ func resultCount(fields *ast.FieldList) int {
 	return count
 }
 
+func functionSignature(t *testing.T, fn *ast.FuncDecl) apiSignature {
+	t.Helper()
+	return apiSignature{
+		Name:    fn.Name.Name,
+		Params:  fieldTypeStrings(t, fn.Type.Params),
+		Results: fieldTypeStrings(t, fn.Type.Results),
+	}
+}
+
+func fluentMethodSignatures(t *testing.T, functions []apiSignature) []apiSignature {
+	t.Helper()
+
+	methods := make([]apiSignature, 0, len(functions))
+	for _, function := range functions {
+		if len(function.Params) == 0 {
+			t.Fatalf("cannot derive fluent method signature from %s without parameters", function.Name)
+		}
+		methods = append(methods, apiSignature{
+			Name:    function.Name,
+			Params:  append([]string(nil), function.Params[1:]...),
+			Results: append([]string(nil), function.Results...),
+		})
+	}
+	sortSignatures(methods)
+	return methods
+}
+
+func fieldTypeStrings(t *testing.T, fields *ast.FieldList) []string {
+	t.Helper()
+	if fields == nil {
+		return nil
+	}
+
+	var values []string
+	for _, field := range fields.List {
+		count := len(field.Names)
+		if count == 0 {
+			count = 1
+		}
+		for i := 0; i < count; i++ {
+			values = append(values, exprString(t, field.Type))
+		}
+	}
+	return values
+}
+
+func exprString(t *testing.T, expr ast.Expr) string {
+	t.Helper()
+
+	var buffer bytes.Buffer
+	if err := printer.Fprint(&buffer, token.NewFileSet(), expr); err != nil {
+		t.Fatalf("print expression: %v", err)
+	}
+	return buffer.String()
+}
+
+func sortSignatures(signatures []apiSignature) {
+	sort.Slice(signatures, func(i, j int) bool {
+		return signatures[i].String() < signatures[j].String()
+	})
+}
+
+func formatSignatures(signatures []apiSignature) string {
+	lines := signatureStrings(signatures)
+	if len(lines) == 0 {
+		return "<none>"
+	}
+	return strings.Join(lines, "\n")
+}
+
+func signatureStrings(signatures []apiSignature) []string {
+	lines := make([]string, 0, len(signatures))
+	for _, signature := range signatures {
+		lines = append(lines, signature.String())
+	}
+	sort.Strings(lines)
+	return lines
+}
+
 func receiverName(expr ast.Expr) string {
 	if star, ok := expr.(*ast.StarExpr); ok {
 		return receiverName(star.X)
@@ -317,13 +419,15 @@ func exprName(expr ast.Expr) string {
 	}
 }
 
-func assertNameSetEqual(a *allure.Context, got []string, want []string, label string) {
+func assertSignatureSetEqual(a *allure.Context, got []apiSignature, want []apiSignature, label string) {
 	a.T().Helper()
 
-	if strings.Join(got, "\n") == strings.Join(want, "\n") {
+	gotLines := signatureStrings(got)
+	wantLines := signatureStrings(want)
+	if strings.Join(gotLines, "\n") == strings.Join(wantLines, "\n") {
 		return
 	}
 
-	a.Attachment("unexpected "+label, []byte("got:\n"+strings.Join(got, "\n")+"\n\nwant:\n"+strings.Join(want, "\n")), "text/plain")
-	a.T().Fatalf("%s do not match upstream testify", label)
+	a.Attachment("unexpected "+label, []byte("got:\n"+strings.Join(gotLines, "\n")+"\n\nwant:\n"+strings.Join(wantLines, "\n")), "text/plain")
+	a.T().Fatalf("%s signatures do not match upstream testify", label)
 }
