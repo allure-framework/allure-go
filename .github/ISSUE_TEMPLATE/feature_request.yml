@@ -1,7 +1,6 @@
 name: Feature request
 description: Suggest an improvement for Allure Go.
-title: "Feature: "
-labels: ["type:feature", "triage"]
+type: feature
 body:
   - type: textarea
     id: problem
