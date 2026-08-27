@@ -396,6 +396,65 @@ func TestTitlePathIncludesPackageFolders(t *testing.T) {
 	})
 }
 
+func TestModuleRelativeFilePath(t *testing.T) {
+	Wrap(t, func(a *Context) {
+		a.Description("Normalizes source paths embedded by Go's -trimpath build flag against an exact main module prefix. " +
+			"The expected result is that root and nested files become module-relative while absolute paths and neighboring module names remain untouched.")
+
+		cases := []struct {
+			name       string
+			file       string
+			modulePath string
+			want       string
+			wantOK     bool
+		}{
+			{
+				name:       "root package",
+				file:       "example.com/acme/repro/identity_test.go",
+				modulePath: "example.com/acme/repro",
+				want:       "identity_test.go",
+				wantOK:     true,
+			},
+			{
+				name:       "nested package",
+				file:       "example.com/acme/repro/internal/check/identity_test.go",
+				modulePath: "example.com/acme/repro",
+				want:       "internal/check/identity_test.go",
+				wantOK:     true,
+			},
+			{
+				name:       "backslash separators",
+				file:       `example.com\acme\repro\internal\identity_test.go`,
+				modulePath: "example.com/acme/repro",
+				want:       "internal/identity_test.go",
+				wantOK:     true,
+			},
+			{
+				name:       "neighboring module prefix",
+				file:       "example.com/acme/reproduction/identity_test.go",
+				modulePath: "example.com/acme/repro",
+			},
+			{
+				name:       "absolute path",
+				file:       "/example.com/acme/repro/identity_test.go",
+				modulePath: "example.com/acme/repro",
+			},
+		}
+
+		for _, tc := range cases {
+			tc := tc
+			a.Step("normalize "+tc.name, func(a *Context) {
+				a.StepParameter("file", tc.file)
+				a.StepParameter("module path", tc.modulePath)
+				got, ok := moduleRelativeFilePath(tc.file, tc.modulePath)
+				if ok != tc.wantOK || got != tc.want {
+					a.T().Fatalf("unexpected module-relative file path: want (%q, %t), got (%q, %t)", tc.want, tc.wantOK, got, ok)
+				}
+			})
+		}
+	})
+}
+
 func TestSuiteLabelsFromSingleElementTitlePath(t *testing.T) {
 	Wrap(t, func(a *Context) {
 		a.Description("Verifies the suite label rule for a title path containing only one segment. " +

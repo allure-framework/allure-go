@@ -266,6 +266,15 @@ var testClaims = struct {
 	byTest: map[*testing.T]*testClaim{},
 }
 
+var currentModulePath = sync.OnceValue(func() string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return ""
+	}
+
+	return info.Main.Path
+})
+
 // Test reports a Go subtest as one Allure test result.
 func Test(t *testing.T, name string, body func(*Context), opts ...Option) {
 	t.Helper()
@@ -888,6 +897,11 @@ func fileTitlePath(file string) []string {
 	if file == "" {
 		return nil
 	}
+	// -trimpath records source files below the main module's import path
+	// instead of below an absolute filesystem directory.
+	if relative, ok := moduleRelativeFilePath(file, currentModulePath()); ok {
+		return cleanPathParts(relative)
+	}
 
 	dir := filepath.Dir(file)
 	moduleDir := findModuleDir(dir)
@@ -901,6 +915,27 @@ func fileTitlePath(file string) []string {
 	}
 
 	return cleanPathParts(relative)
+}
+
+func moduleRelativeFilePath(file string, modulePath string) (string, bool) {
+	if file == "" || modulePath == "" || filepath.IsAbs(file) {
+		return "", false
+	}
+
+	normalizedFile := filepath.ToSlash(file)
+	normalizedFile = strings.ReplaceAll(normalizedFile, "\\", "/")
+	normalizedFile = strings.TrimPrefix(normalizedFile, "./")
+	normalizedModule := strings.TrimSuffix(strings.ReplaceAll(modulePath, "\\", "/"), "/")
+	if normalizedModule == "" {
+		return "", false
+	}
+
+	relative, ok := strings.CutPrefix(normalizedFile, normalizedModule+"/")
+	if !ok || relative == "" {
+		return "", false
+	}
+
+	return relative, true
 }
 
 func findModuleDir(dir string) string {
