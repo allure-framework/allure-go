@@ -444,30 +444,45 @@ func (a *Context) Helper() {
 	a.t.Helper()
 }
 
+// Error reports a test failure on the underlying testing.T.
+func (a *Context) Error(args ...interface{}) {
+	a.t.Helper()
+	a.recordFailureMessage(strings.TrimSuffix(fmt.Sprintln(args...), "\n"))
+	a.t.Error(args...)
+}
+
 // Errorf reports a formatted test failure on the underlying testing.T.
 func (a *Context) Errorf(format string, args ...interface{}) {
 	a.t.Helper()
-	a.recordStatusDetails(fmt.Sprintf(format, args...))
+	a.recordFailureMessage(fmt.Sprintf(format, args...))
 	a.t.Errorf(format, args...)
+}
+
+// Fail marks the test failed on the underlying testing.T and continues execution.
+func (a *Context) Fail() {
+	a.t.Helper()
+	a.recordFailure(nil)
+	a.t.Fail()
 }
 
 // Fatal reports a test failure with Allure status details and stops execution.
 func (a *Context) Fatal(args ...interface{}) {
 	a.t.Helper()
-	a.recordStatusDetails(strings.TrimSuffix(fmt.Sprintln(args...), "\n"))
+	a.recordFailureMessage(strings.TrimSuffix(fmt.Sprintln(args...), "\n"))
 	a.t.Fatal(args...)
 }
 
 // Fatalf reports a formatted test failure with Allure status details and stops execution.
 func (a *Context) Fatalf(format string, args ...interface{}) {
 	a.t.Helper()
-	a.recordStatusDetails(fmt.Sprintf(format, args...))
+	a.recordFailureMessage(fmt.Sprintf(format, args...))
 	a.t.Fatalf(format, args...)
 }
 
 // FailNow marks the test failed and stops execution on the underlying testing.T.
 func (a *Context) FailNow() {
 	a.t.Helper()
+	a.recordFailure(nil)
 	a.t.FailNow()
 }
 
@@ -481,12 +496,21 @@ func (a *Context) Context() context.Context {
 	return a.ctx
 }
 
-func (a *Context) recordStatusDetails(message string) {
-	if a.runtime == nil || message == "" {
+func (a *Context) recordFailure(details *model.StatusDetails) {
+	if a.runtime == nil {
 		return
 	}
 
-	a.runtime.recordStatusDetails(&model.StatusDetails{Message: message})
+	a.runtime.recordFailure(details)
+}
+
+func (a *Context) recordFailureMessage(message string) {
+	if message == "" {
+		a.recordFailure(nil)
+		return
+	}
+
+	a.recordFailure(&model.StatusDetails{Message: message})
 }
 
 // Step reports body as an Allure step.
@@ -678,7 +702,7 @@ func (a *Context) emit(message allureruntime.Message) {
 
 func (a *Context) report(err error) {
 	if err != nil {
-		a.t.Errorf("allure: %v", err)
+		a.Errorf("allure: %v", err)
 	}
 }
 
@@ -1093,23 +1117,24 @@ func (r *testRuntime) applyMetadata(metadata *allureruntime.Metadata) {
 	}
 }
 
-func (r *testRuntime) recordStatusDetails(details *model.StatusDetails) {
-	if details == nil {
-		return
-	}
-
+func (r *testRuntime) recordFailure(details *model.StatusDetails) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if r.result.StatusDetails == nil {
+	if details != nil && r.result.StatusDetails == nil {
 		r.result.StatusDetails = cloneStatusDetails(details)
+	}
+	for _, step := range r.steps {
+		if step.Status == "" || step.Status == model.StatusPassed {
+			step.Status = model.StatusFailed
+		}
 	}
 	if len(r.steps) == 0 {
 		return
 	}
 
 	step := r.steps[len(r.steps)-1]
-	if step.StatusDetails == nil {
+	if details != nil && step.StatusDetails == nil {
 		step.StatusDetails = cloneStatusDetails(details)
 	}
 }
@@ -1174,6 +1199,9 @@ func (r *testRuntime) stopStep(message allureruntime.Message) {
 	status := message.StepStop.Status
 	if status == "" {
 		status = model.StatusPassed
+	}
+	if status == model.StatusPassed && step.Status == model.StatusFailed {
+		status = model.StatusFailed
 	}
 
 	step.Status = status

@@ -73,6 +73,22 @@ func TestGotestRunContractStatusesAndMetadata(t *testing.T) {
 	})
 }
 
+func TestGotestAttributesStepFailuresAfterEarlierFailure(t *testing.T) {
+	Wrap(t, func(a *Context) {
+		a.Description("Runs a failing gotest probe that records an error before later passing, failing, nested, Fail, and FailNow steps. " +
+			"The expected result is that the earlier failure does not taint a later passing step, while every step active during a new failure is reported as failed with available status details.")
+
+		run := runProbe(a, "^TestStepFailuresAfterEarlierFailure$", "", "", true, nil)
+
+		a.Step("verify step failure probe process exit status", func(a *Context) {
+			assertProbeExit(a.T(), "step failures after earlier failure", run.err, false, run.output)
+		})
+		a.Step("verify step failure attribution", func(a *Context) {
+			assertStepFailureAttributionResult(a.T(), requireOneResult(a.T(), run))
+		})
+	})
+}
+
 func TestGotestConfigurationResultsDirectory(t *testing.T) {
 	Wrap(t, func(a *Context) {
 		a.Description("Verifies the result directory behavior used by command-line Go test runs. " +
@@ -720,6 +736,58 @@ func assertStatusProbeResult(t *testing.T, result model.TestResult, mode string,
 		if result.Steps[1].StatusDetails == nil || result.Steps[1].StatusDetails.Message != "probe failed intentionally" {
 			t.Fatalf("missing failed step status details: %#v", result.Steps[1].StatusDetails)
 		}
+	}
+}
+
+func assertStepFailureAttributionResult(t *testing.T, result model.TestResult) {
+	t.Helper()
+
+	if result.Status != model.StatusFailed {
+		t.Fatalf("expected failed result, got %s: %#v", result.Status, result)
+	}
+	if result.StatusDetails == nil || result.StatusDetails.Message != "first failure outside any step" {
+		t.Fatalf("unexpected test status details: %#v", result.StatusDetails)
+	}
+	if len(result.Steps) != 5 {
+		t.Fatalf("expected five step results, got %#v", result.Steps)
+	}
+
+	passing := result.Steps[0]
+	if passing.Name != "pass after earlier failure" || passing.Status != model.StatusPassed {
+		t.Fatalf("earlier failure tainted later passing step: %#v", passing)
+	}
+
+	errorfStep := result.Steps[1]
+	if errorfStep.Name != "fail with Errorf after earlier failure" || errorfStep.Status != model.StatusFailed {
+		t.Fatalf("Errorf step was not failed: %#v", errorfStep)
+	}
+	if errorfStep.StatusDetails == nil || errorfStep.StatusDetails.Message != "second failure inside step" {
+		t.Fatalf("unexpected Errorf step details: %#v", errorfStep.StatusDetails)
+	}
+
+	nestedParent := result.Steps[2]
+	if nestedParent.Name != "propagate nested failure to parent" || nestedParent.Status != model.StatusFailed {
+		t.Fatalf("nested failure did not fail parent step: %#v", nestedParent)
+	}
+	if len(nestedParent.Steps) != 1 {
+		t.Fatalf("expected one nested step, got %#v", nestedParent.Steps)
+	}
+	nested := nestedParent.Steps[0]
+	if nested.Name != "fail nested step with Error" || nested.Status != model.StatusFailed {
+		t.Fatalf("nested Error step was not failed: %#v", nested)
+	}
+	if nested.StatusDetails == nil || nested.StatusDetails.Message != "nested failure inside step" {
+		t.Fatalf("unexpected nested Error step details: %#v", nested.StatusDetails)
+	}
+
+	failStep := result.Steps[3]
+	if failStep.Name != "fail with Fail after earlier failure" || failStep.Status != model.StatusFailed {
+		t.Fatalf("Fail step was not failed: %#v", failStep)
+	}
+
+	failNowStep := result.Steps[4]
+	if failNowStep.Name != "fail with FailNow after earlier failure" || failNowStep.Status != model.StatusFailed {
+		t.Fatalf("FailNow step was not failed: %#v", failNowStep)
 	}
 }
 
