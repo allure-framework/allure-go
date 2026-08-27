@@ -64,7 +64,8 @@ jobs:
 
           declare -A module_paths=()
           for module_dir in "${module_dirs[@]}"; do
-            module_paths["${module_dir}"]="$(cd "${module_dir}" && go list -m -f '{{ .Path }}')"
+            # Workspace mode lists every main module, so inspect each module in isolation.
+            module_paths["${module_dir}"]="$(cd "${module_dir}" && GOWORK=off go list -m -f '{{ .Path }}')"
           done
 
           for module_dir in "${module_dirs[@]}"; do
