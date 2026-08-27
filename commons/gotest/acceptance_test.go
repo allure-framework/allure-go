@@ -207,6 +207,40 @@ func TestGotestWrapReportsCurrentTest(t *testing.T) {
 	})
 }
 
+func TestGotestTrimpathPreservesGeneratedIdentity(t *testing.T) {
+	Wrap(t, func(a *Context) {
+		a.Description("Runs the same root-package gotest probe with and without Go's -trimpath build flag. " +
+			"The expected result is that source path normalization produces the same module-relative full name, title path, test case id, and history id in both builds.")
+
+		var regularRun probeRun
+		a.Step("run root-package probe without trimpath", func(a *Context) {
+			regularRun = runProbe(a, "^TestWrappedCurrentTest$", "", "", true, nil)
+			assertProbeExit(a.T(), "regular identity", regularRun.err, true, regularRun.output)
+		})
+
+		var trimmedRun probeRun
+		a.Step("run root-package probe with trimpath", func(a *Context) {
+			trimmedRun = runProbeWithGoTestArgs(a, []string{"-trimpath"}, "^TestWrappedCurrentTest$", "", "", true, nil)
+			assertProbeExit(a.T(), "trimpath identity", trimmedRun.err, true, trimmedRun.output)
+		})
+
+		a.Step("verify generated identity remains stable", func(a *Context) {
+			regular := requireOneResult(a.T(), regularRun)
+			trimmed := requireOneResult(a.T(), trimmedRun)
+			a.Attachment("identity comparison", []byte(identityComparisonEvidence(regular, trimmed)), "text/plain")
+
+			assertWrappedProbeResult(a.T(), regular)
+			assertWrappedProbeResult(a.T(), trimmed)
+			if regular.TestCaseID == "" || regular.TestCaseID != trimmed.TestCaseID {
+				a.T().Fatalf("test case id changed under -trimpath: %q != %q", regular.TestCaseID, trimmed.TestCaseID)
+			}
+			if regular.HistoryID == "" || regular.HistoryID != trimmed.HistoryID {
+				a.T().Fatalf("history id changed under -trimpath: %q != %q", regular.HistoryID, trimmed.HistoryID)
+			}
+		})
+	})
+}
+
 func TestGotestTestPlanFiltering(t *testing.T) {
 	Wrap(t, func(a *Context) {
 		a.Description("Creates temporary Go projects and runs them with ALLURE_TESTPLAN_PATH configured for static metadata known before the test body executes. " +
@@ -275,10 +309,16 @@ func runStatusProbe(a *Context, mode string, resultDir string, chdir string, set
 }
 
 func runProbe(a *Context, pattern string, resultDir string, chdir string, setResultsDir bool, extraEnv map[string]string, preparedFiles ...string) probeRun {
+	return runProbeWithGoTestArgs(a, nil, pattern, resultDir, chdir, setResultsDir, extraEnv, preparedFiles...)
+}
+
+func runProbeWithGoTestArgs(a *Context, goTestArgs []string, pattern string, resultDir string, chdir string, setResultsDir bool, extraEnv map[string]string, preparedFiles ...string) probeRun {
 	a.T().Helper()
 
 	var project probeProject
-	commandArgs := []string{"go", "test", "-count=1", "-run", pattern, "."}
+	commandArgs := []string{"go", "test"}
+	commandArgs = append(commandArgs, goTestArgs...)
+	commandArgs = append(commandArgs, "-count=1", "-run", pattern, ".")
 	commandLine := strings.Join(commandArgs, " ")
 	var artifactDir string
 
@@ -707,6 +747,21 @@ func assertWrappedProbeResult(t *testing.T, result model.TestResult) {
 	if len(result.Steps) != 1 {
 		t.Fatalf("expected one wrapped result step, got %#v", result.Steps)
 	}
+}
+
+func identityComparisonEvidence(regular model.TestResult, trimmed model.TestResult) string {
+	return strings.Join([]string{
+		"without -trimpath:",
+		"  fullName=" + regular.FullName,
+		"  testCaseId=" + regular.TestCaseID,
+		"  historyId=" + regular.HistoryID,
+		"  titlePath=" + strings.Join(regular.TitlePath, "/"),
+		"with -trimpath:",
+		"  fullName=" + trimmed.FullName,
+		"  testCaseId=" + trimmed.TestCaseID,
+		"  historyId=" + trimmed.HistoryID,
+		"  titlePath=" + strings.Join(trimmed.TitlePath, "/"),
+	}, "\n")
 }
 
 func assertProbeGlobals(t *testing.T, run probeRun, mode string) {
