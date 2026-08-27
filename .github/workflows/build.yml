@@ -40,7 +40,7 @@ jobs:
         run: |
           git config --global core.autocrlf false
 
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v7.0.1
 
       - uses: actions/setup-node@v6
         with:
@@ -115,7 +115,7 @@ jobs:
       ALLURE_ENDPOINT: ${{ secrets.ALLURE_ENDPOINT }}
       ALLURE_PROJECT_ID: ${{ secrets.ALLURE_PROJECT_ID }}
     steps:
-      - uses: actions/checkout@v6.0.3
+      - uses: actions/checkout@v7.0.1
 
       - uses: actions/setup-node@v6
         with:
