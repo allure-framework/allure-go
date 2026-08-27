@@ -1,5 +1,5 @@
-github.com/allure-framework/allure-go/commons v1.2.0 h1:ptgQIIwlnhlJr7cVlDt4uzhxo5EMqOfemaLkCshMgbo=
-github.com/allure-framework/allure-go/commons v1.2.0/go.mod h1:h+DnKOe9nlqqZFi18LjWq6UVfj3uno5z8itU7+sysAE=
+github.com/allure-framework/allure-go/commons v1.2.1 h1:eTRr1QFlI66A+/tyUWxpaJC5xZ7gO97kmJEY59QAztg=
+github.com/allure-framework/allure-go/commons v1.2.1/go.mod h1:h+DnKOe9nlqqZFi18LjWq6UVfj3uno5z8itU7+sysAE=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
 go.yaml.in/yaml/v3 v3.0.5 h1:N6y/pJk8buWs9NY5ERU2HSMfm+IuD/OtfdAnq6kESPw=
