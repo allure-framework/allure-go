@@ -70,6 +70,35 @@ func TestProbeStatus(t *testing.T) {
 	}, allure.WithIDGenerator(probeIDs("status-"+mode)))
 }
 
+func TestStepFailuresAfterEarlierFailure(t *testing.T) {
+	allure.Test(t, "steps attribute failures after an earlier failure", func(a *allure.Context) {
+		a.Description("Fails the reported test before running later passing and failing steps through representative continuing and terminating Context failure paths. " +
+			"The expected result is that only steps active during a new failure are failed, nested failures propagate to their parent step, and FailNow still finishes the active step as failed.")
+
+		a.Errorf("first failure outside any step")
+
+		a.Step("pass after earlier failure", func(a *allure.Context) {})
+
+		a.Step("fail with Errorf after earlier failure", func(a *allure.Context) {
+			a.Errorf("second failure inside step")
+		})
+
+		a.Step("propagate nested failure to parent", func(a *allure.Context) {
+			a.Step("fail nested step with Error", func(a *allure.Context) {
+				a.Error("nested failure inside step")
+			})
+		})
+
+		a.Step("fail with Fail after earlier failure", func(a *allure.Context) {
+			a.Fail()
+		})
+
+		a.Step("fail with FailNow after earlier failure", func(a *allure.Context) {
+			a.FailNow()
+		})
+	}, allure.WithIDGenerator(probeIDs("step-failures")))
+}
+
 func TestNestedSubtests(t *testing.T) {
 	for _, name := range []string{"valid credentials", "locked account"} {
 		name := name
