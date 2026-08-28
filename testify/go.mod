@@ -3,7 +3,7 @@ module github.com/allure-framework/allure-go/testify
 go 1.25.0
 
 require (
-	github.com/allure-framework/allure-go/commons v1.2.1
+	github.com/allure-framework/allure-go/commons v1.3.0
 	github.com/stretchr/testify v1.12.1
 )
 
