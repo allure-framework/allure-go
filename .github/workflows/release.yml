@@ -39,58 +39,8 @@ jobs:
           [ "${GITHUB_REF_TYPE}" = "branch" ]
           [[ "${RELEASE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]
 
-      - name: Discover modules
-        shell: bash
-        run: |
-          if [ -f go.work ]; then
-            go work edit -json | sed -n 's/.*"DiskPath": "\(.*\)".*/\1/p' | sed 's#^\./##' | sort > .release-modules
-          else
-            find . -name go.mod -not -path './.git/*' -exec dirname {} \; | sed 's#^\./##' | sort > .release-modules
-          fi
-
-          mapfile -t module_dirs < .release-modules
-          if [ "${#module_dirs[@]}" -eq 0 ]; then
-            echo "No Go modules found"
-            exit 1
-          fi
-
-          printf 'Modules to release:\n'
-          printf -- '- %s\n' "${module_dirs[@]}"
-
-      - name: Pin internal module dependencies
-        shell: bash
-        run: |
-          mapfile -t module_dirs < .release-modules
-
-          declare -A module_paths=()
-          for module_dir in "${module_dirs[@]}"; do
-            # Workspace mode lists every main module, so inspect each module in isolation.
-            module_paths["${module_dir}"]="$(cd "${module_dir}" && GOWORK=off go list -m -f '{{ .Path }}')"
-          done
-
-          for module_dir in "${module_dirs[@]}"; do
-            module_path="${module_paths[${module_dir}]}"
-            for dep_dir in "${module_dirs[@]}"; do
-              dep_path="${module_paths[${dep_dir}]}"
-              if [ "${module_path}" = "${dep_path}" ]; then
-                continue
-              fi
-              if awk -v dep="${dep_path}" '
-                $1 == "require" && $2 == dep { found = 1 }
-                $1 == dep && $2 ~ /^v/ { found = 1 }
-                END { exit !found }
-              ' "${module_dir}/go.mod"; then
-                (cd "${module_dir}" && go mod edit -require="${dep_path}@v${RELEASE_VERSION}")
-              fi
-            done
-          done
-
-      - name: Tidy modules
-        shell: bash
-        run: |
-          while IFS= read -r module_dir || [ -n "${module_dir}" ]; do
-            (cd "${module_dir}" && go mod tidy)
-          done < .release-modules
+      - name: Prepare release modules
+        run: ./.github/scripts/prepare-release-modules.sh "${RELEASE_VERSION}"
 
       - name: Check formatting
         shell: bash
