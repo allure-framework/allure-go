@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 
 	"github.com/allure-framework/allure-go/commons/model"
 )
@@ -37,6 +38,9 @@ type Writer interface {
 }
 
 // FileSystemWriter writes Allure artifacts to a directory on disk.
+// Each artifact is staged beside its target as <target>.tmp, synced when supported,
+// closed, then renamed.
+// Writes fail if the staging path is already occupied.
 type FileSystemWriter struct {
 	Dir string
 }
@@ -134,6 +138,10 @@ func (w *FileSystemWriter) writeBytes(ctx context.Context, name string, payload 
 }
 
 func (w *FileSystemWriter) writeFile(ctx context.Context, name string, reader io.Reader) error {
+	return w.writeFileWithSync(ctx, name, reader, (*os.File).Sync)
+}
+
+func (w *FileSystemWriter) writeFileWithSync(ctx context.Context, name string, reader io.Reader, syncFile func(*os.File) error) error {
 	if err := checkContext(ctx); err != nil {
 		return err
 	}
@@ -147,12 +155,14 @@ func (w *FileSystemWriter) writeFile(ctx context.Context, name string, reader io
 		return err
 	}
 
-	temp, err := os.CreateTemp(w.Dir, "."+filepath.Base(target)+".tmp-*")
+	// Consumers ignore only the .tmp suffix. Exclusive creation prevents another
+	// write from truncating an artifact that is still being staged.
+	tempName := target + ".tmp"
+	temp, err := os.OpenFile(tempName, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return fmt.Errorf("create temp file: %w", err)
 	}
 
-	tempName := temp.Name()
 	removeTemp := true
 	defer func() {
 		if removeTemp {
@@ -163,6 +173,11 @@ func (w *FileSystemWriter) writeFile(ctx context.Context, name string, reader io
 	if _, err := io.Copy(temp, reader); err != nil {
 		_ = temp.Close()
 		return fmt.Errorf("write temp file: %w", err)
+	}
+	// Some filesystems report EINVAL when the file does not support syncing.
+	if err := syncFile(temp); err != nil && !errors.Is(err, errors.ErrUnsupported) && !errors.Is(err, syscall.EINVAL) {
+		_ = temp.Close()
+		return fmt.Errorf("sync temp file: %w", err)
 	}
 	if err := temp.Close(); err != nil {
 		return fmt.Errorf("close temp file: %w", err)

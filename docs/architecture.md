@@ -46,4 +46,4 @@ Only the active runtime or adapter should mutate in-flight result objects. Write
 - `environment.properties`
 - `categories.json`
 
-The filesystem writer writes payloads through temporary files and renames them after close so a result does not reference a partially written attachment.
+The filesystem writer stages each payload as `<target filename>.tmp` in the same results directory, syncs it when supported, closes it, then renames it to the target. Consumers ignore the `.tmp` files while they are being written. Unsupported sync errors (including `EINVAL` from sync) do not prevent publication. Other sync errors cause the writer to close and remove the temporary file without publishing it. If a staging path is already occupied, the write fails without modifying it.
