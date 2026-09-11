@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 
 	allure "github.com/allure-framework/allure-go/commons/gotest"
@@ -80,6 +81,188 @@ func TestFileSystemWriterWritesArtifacts(t *testing.T) {
 			assertFileContains(a.T(), filepath.Join(dir, "global-1-globals.json"), `"setup failed"`)
 		})
 	})
+}
+
+func TestFileSystemWriterUsesTargetTmpPath(t *testing.T) {
+	allure.Wrap(t, func(a *allure.Context) {
+		a.Description("Verifies that an attachment is staged at <target>.tmp in the results directory, so consumers ignore it until publication. A blocked staging path must preserve the published attachment, and a successful retry must leave only the completed target.")
+
+		dir := a.T().TempDir()
+		w := writer.NewFileSystemWriter(dir)
+		target := filepath.Join(dir, "payload.txt")
+		temporary := target + ".tmp"
+
+		a.Step("publish an attachment and block its staging path", func(a *allure.Context) {
+			if err := w.WriteAttachment(context.Background(), "payload.txt", []byte("published")); err != nil {
+				a.T().Fatalf("write initial attachment: %v", err)
+			}
+			if err := os.Mkdir(temporary, 0o755); err != nil {
+				a.T().Fatalf("block staging path: %v", err)
+			}
+		})
+
+		a.Step("verify a blocked target.tmp preserves the published attachment", func(a *allure.Context) {
+			err := w.WriteAttachment(context.Background(), "payload.txt", []byte("replacement"))
+			if err == nil {
+				a.T().Fatal("expected write to fail while payload.txt.tmp is blocked")
+			}
+			content, readErr := os.ReadFile(target)
+			if readErr != nil {
+				a.T().Fatalf("read published attachment: %v", readErr)
+			}
+			a.Attachment("blocked staging attempt", []byte(fmt.Sprintf("staging path: %s\nerror: %v\npublished content: %q", temporary, err, content)), "text/plain")
+			if string(content) != "published" {
+				a.T().Fatalf("published content changed after staging failure: %q", content)
+			}
+			info, err := os.Stat(temporary)
+			if err != nil || !info.IsDir() {
+				a.T().Fatalf("staging blocker was changed: info=%v, error=%v", info, err)
+			}
+		})
+
+		a.Step("unblock staging and verify publication removes the temporary file", func(a *allure.Context) {
+			if err := os.Remove(temporary); err != nil {
+				a.T().Fatalf("remove staging blocker: %v", err)
+			}
+			if err := w.WriteAttachment(context.Background(), "payload.txt", []byte("replacement")); err != nil {
+				a.T().Fatalf("retry attachment write: %v", err)
+			}
+			content, err := os.ReadFile(target)
+			if err != nil {
+				a.T().Fatalf("read replacement attachment: %v", err)
+			}
+			a.Attachment("published payload.txt", content, "text/plain")
+			if string(content) != "replacement" {
+				a.T().Fatalf("unexpected replacement content: %q", content)
+			}
+			entries, err := os.ReadDir(dir)
+			if err != nil {
+				a.T().Fatalf("read results directory: %v", err)
+			}
+			if len(entries) != 1 || entries[0].Name() != "payload.txt" {
+				a.T().Fatalf("expected only payload.txt after publication, got %v", entries)
+			}
+		})
+	})
+}
+
+func TestFileSystemWriterPreservesExistingStagingFile(t *testing.T) {
+	allure.Wrap(t, func(a *allure.Context) {
+		a.Description("Verifies that a write cannot truncate or publish another write's unfinished <target>.tmp file when the exact staging path is already occupied.")
+
+		dir := a.T().TempDir()
+		w := writer.NewFileSystemWriter(dir)
+		temporary := filepath.Join(dir, "payload.txt.tmp")
+
+		a.Step("prepare an unfinished attachment in the staging file", func(a *allure.Context) {
+			if err := os.WriteFile(temporary, []byte("unfinished attachment"), 0o600); err != nil {
+				a.T().Fatalf("write staging fixture: %v", err)
+			}
+		})
+
+		a.Step("verify a competing write leaves the staging file untouched", func(a *allure.Context) {
+			err := w.WriteAttachment(context.Background(), "payload.txt", []byte("competing attachment"))
+			if !errors.Is(err, os.ErrExist) {
+				a.T().Fatalf("expected an occupied staging path error, got %v", err)
+			}
+			content, err := os.ReadFile(temporary)
+			if err != nil {
+				a.T().Fatalf("read unfinished staging file: %v", err)
+			}
+			a.Attachment("preserved payload.txt.tmp", content, "text/plain")
+			if string(content) != "unfinished attachment" {
+				a.T().Fatalf("unfinished staging content changed: %q", content)
+			}
+			if _, err := os.Stat(filepath.Join(dir, "payload.txt")); !errors.Is(err, os.ErrNotExist) {
+				a.T().Fatalf("target must not be published by the competing write: %v", err)
+			}
+		})
+	})
+}
+
+func TestFileSystemWriterSyncErrors(t *testing.T) {
+	cases := []struct {
+		name    string
+		syncErr error
+		publish bool
+	}{
+		{name: "successful_sync", publish: true},
+		{name: "unsupported_sync", syncErr: errors.ErrUnsupported, publish: true},
+		{name: "wrapped_unsupported_sync", syncErr: fmt.Errorf("filesystem: %w", &os.PathError{Op: "sync", Path: "payload.txt.tmp", Err: errors.ErrUnsupported}), publish: true},
+		{name: "unsupported_file_sync", syncErr: &os.PathError{Op: "sync", Path: "payload.txt.tmp", Err: syscall.EINVAL}, publish: true},
+		{name: "io_failure", syncErr: &os.PathError{Op: "sync", Path: "payload.txt.tmp", Err: syscall.EIO}},
+		{name: "permission_failure", syncErr: os.ErrPermission},
+		{name: "closed_file", syncErr: os.ErrClosed},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			allure.Wrap(t, func(a *allure.Context) {
+				a.Description("Verifies that synchronization is attempted on the complete, open temporary file before publication. Unsupported sync permits publication; other sync errors preserve the previous target. Both outcomes remove the temporary file.")
+				a.Parameter("sync error", fmt.Sprint(tc.syncErr))
+				a.Parameter("publish replacement", fmt.Sprint(tc.publish))
+
+				dir := a.T().TempDir()
+				target := filepath.Join(dir, "payload.txt")
+				w := writer.NewFileSystemWriter(dir)
+
+				a.Step("prepare an existing published attachment", func(a *allure.Context) {
+					if err := os.WriteFile(target, []byte("published"), 0o600); err != nil {
+						a.T().Fatalf("prepare target: %v", err)
+					}
+				})
+
+				var writeErr error
+				syncCalls := 0
+				var stagedPath string
+				var stagedContent, previousContent []byte
+				var statErr, stagedReadErr, previousReadErr error
+				a.Step("write the replacement and simulate the filesystem sync result", func(a *allure.Context) {
+					writeErr = writer.WriteFileWithSync(context.Background(), w, "payload.txt", strings.NewReader("replacement"), func(file *os.File) error {
+						syncCalls++
+						stagedPath = file.Name()
+						_, statErr = file.Stat()
+						stagedContent, stagedReadErr = os.ReadFile(stagedPath)
+						previousContent, previousReadErr = os.ReadFile(target)
+						return tc.syncErr
+					})
+					a.Attachment("sync observation", []byte(fmt.Sprintf("sync calls: %d\nstaging path: %s\nstaged content: %q\ntarget content during sync: %q\nopen file error: %v\nstaged read error: %v\ntarget read error: %v\nwrite error: %v", syncCalls, stagedPath, stagedContent, previousContent, statErr, stagedReadErr, previousReadErr, writeErr)), "text/plain")
+				})
+
+				a.Step("verify sync ordering, publication outcome, and staging cleanup", func(a *allure.Context) {
+					if syncCalls != 1 || stagedPath != target+".tmp" {
+						a.T().Fatalf("expected one sync of %s.tmp, got %d calls at %q", target, syncCalls, stagedPath)
+					}
+					if statErr != nil || stagedReadErr != nil || previousReadErr != nil {
+						a.T().Fatalf("sync must happen on an open staged file before replacing the target: stat=%v, staged read=%v, target read=%v", statErr, stagedReadErr, previousReadErr)
+					}
+					if string(stagedContent) != "replacement" || string(previousContent) != "published" {
+						a.T().Fatalf("unexpected content during sync: staged=%q, target=%q", stagedContent, previousContent)
+					}
+					expectedContent := "published"
+					if tc.publish {
+						expectedContent = "replacement"
+						if writeErr != nil {
+							a.T().Fatalf("expected publication after successful or unsupported sync, got %v", writeErr)
+						}
+					} else if !errors.Is(writeErr, tc.syncErr) {
+						a.T().Fatalf("expected sync error %v, got %v", tc.syncErr, writeErr)
+					}
+					content, err := os.ReadFile(target)
+					if err != nil {
+						a.T().Fatalf("read final target: %v", err)
+					}
+					a.Attachment("final payload.txt", content, "text/plain")
+					if string(content) != expectedContent {
+						a.T().Fatalf("expected target content %q, got %q", expectedContent, content)
+					}
+					if _, err := os.Stat(target + ".tmp"); !errors.Is(err, os.ErrNotExist) {
+						a.T().Fatalf("temporary file must be removed after the write: %v", err)
+					}
+				})
+			})
+		})
+	}
 }
 
 func TestInMemoryWriterSnapshotsArtifacts(t *testing.T) {
