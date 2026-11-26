@@ -6,11 +6,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
 
 	commons "github.com/allure-framework/allure-go/commons"
+	"github.com/allure-framework/allure-go/commons/ids"
 	"github.com/allure-framework/allure-go/commons/model"
 	"github.com/allure-framework/allure-go/commons/testplan"
 )
@@ -184,6 +186,15 @@ func TestGotestWrapReportsCurrentTest(t *testing.T) {
 			})
 		})
 
+		a.Step("verify an empty final title path restores the Wrap caller", func(a *Context) {
+			run := runProbe(a, "^TestWrappedResetTitlePath$", "", "", true, nil)
+			assertProbeExit(a.T(), "reset wrapped title path", run.err, true, run.output)
+			result := requireOneResult(a.T(), run)
+			if !slices.Equal(result.TitlePath, []string{"probe_test.go"}) || result.FullName != "probe_test.go/TestWrappedResetTitlePath" {
+				a.T().Fatalf("unexpected caller identity after reset: titlePath=%q fullName=%q", result.TitlePath, result.FullName)
+			}
+		})
+
 		a.Step("verify duplicate Wrap call fails clearly", func(a *Context) {
 			run := runProbe(a, "^TestDuplicateWrapFails$", "", "", true, nil)
 
@@ -257,6 +268,41 @@ func TestGotestTrimpathPreservesGeneratedIdentity(t *testing.T) {
 	})
 }
 
+func TestGotestAdapterTitlePath(t *testing.T) {
+	Wrap(t, func(a *Context) {
+		a.Description("Runs the same wrapped Go test for two source packages and rebuilds one with -trimpath. " +
+			"Each result should use the adapter's source path for its full name, suite hierarchy and generated IDs.")
+
+		for _, tc := range []struct {
+			pkg   string
+			flags []string
+		}{
+			{pkg: "popup"},
+			{pkg: "dialog"},
+			{pkg: "popup", flags: []string{"-trimpath"}},
+		} {
+			a.Step("verify wrapped identity for "+strings.Join(append([]string{tc.pkg}, tc.flags...), " "), func(a *Context) {
+				run := runProbeWithGoTestArgs(a, tc.flags, "^TestWrappedCurrentTest$", "", "", true, map[string]string{
+					"ALLURE_GOTEST_SOURCE_PACKAGE": tc.pkg,
+				})
+				assertProbeExit(a.T(), "wrapped source path", run.err, true, run.output)
+				result := requireOneResult(a.T(), run)
+				path := []string{"tests", tc.pkg, "create_test.go"}
+				name := strings.Join(path, "/") + "/TestWrappedCurrentTest"
+				if !slices.Equal(result.TitlePath, path) || result.FullName != name {
+					a.T().Fatalf("want title path %q and full name %q, got %q and %q", path, name, result.TitlePath, result.FullName)
+				}
+				if result.TestCaseID != ids.TestCaseID(name) || result.HistoryID != ids.HistoryIDFromFullName(name, nil) {
+					a.T().Fatalf("unexpected IDs for %q: testCaseId=%q historyId=%q", name, result.TestCaseID, result.HistoryID)
+				}
+				if !hasLabel(result.Labels, labelParentSuite, "tests") || !hasLabel(result.Labels, labelSuite, tc.pkg) || !hasLabel(result.Labels, labelSubSuite, "create_test.go") {
+					a.T().Fatalf("unexpected suite hierarchy for %q: %#v", path, result.Labels)
+				}
+			})
+		}
+	})
+}
+
 func TestGotestTestPlanFiltering(t *testing.T) {
 	Wrap(t, func(a *Context) {
 		a.Description("Creates temporary Go projects and runs them with ALLURE_TESTPLAN_PATH configured for static metadata known before the test body executes. " +
@@ -280,19 +326,27 @@ func TestGotestTestPlanFiltering(t *testing.T) {
 			})
 		})
 
-		a.Step("select child test by full name", func(a *Context) {
-			planPath := writeProbeTestPlan(a, `{"version":"1.0","tests":[{"selector":"probe_test.go/TestPlanFullNameSelection/selected-by-full-name"}]}`)
-			run := runProbe(a, "^TestPlanFullNameSelection$", "", "", true, map[string]string{
-				testplan.EnvPath: planPath,
-			}, planPath)
+		for _, tc := range []struct {
+			path string
+			test string
+		}{
+			{"probe_test.go", "TestPlanFullNameSelection"},
+			{"tests/plan_test.go", "TestPlanExplicitFullNameSelection"},
+		} {
+			selector := tc.path + "/" + tc.test + "/selected-by-full-name"
+			a.Step("select child test by "+selector, func(a *Context) {
+				planPath := writeProbeTestPlan(a, `{"version":"1.0","tests":[{"selector":"`+selector+`"}]}`)
+				run := runProbe(a, "^"+tc.test+"$", "", "", true, map[string]string{
+					testplan.EnvPath: planPath,
+				}, planPath)
 
-			a.Step("verify full-name test plan process exit status", func(a *Context) {
 				assertProbeExit(a.T(), "full-name test plan", run.err, true, run.output)
-			})
-			a.Step("verify only the selected full-name result is reported", func(a *Context) {
 				assertScenarioResults(a.T(), run, "planCase", []string{"selected-full-name"})
+				if result := requireOneResult(a.T(), run); result.FullName != selector {
+					a.T().Fatalf("expected selected full name %q, got %q", selector, result.FullName)
+				}
 			})
-		})
+		}
 	})
 }
 
@@ -809,7 +863,10 @@ func assertWrappedProbeResult(t *testing.T, result model.TestResult) {
 	if strings.Join(result.TitlePath, "\n") != "probe_test.go" {
 		t.Fatalf("unexpected wrapped result title path: %#v", result.TitlePath)
 	}
-	if !hasLabel(result.Labels, "framework", "go-test") || !hasLabel(result.Labels, "wrapCase", "current") {
+	if result.TestCaseID != ids.TestCaseID(result.FullName) || result.HistoryID != ids.HistoryIDFromFullName(result.FullName, nil) {
+		t.Fatalf("unexpected wrapped result IDs: testCaseId=%q historyId=%q", result.TestCaseID, result.HistoryID)
+	}
+	if !hasLabel(result.Labels, labelSuite, "probe_test.go") || !hasLabel(result.Labels, "framework", "go-test") || !hasLabel(result.Labels, "wrapCase", "current") {
 		t.Fatalf("missing wrapped result labels: %#v", result.Labels)
 	}
 	if len(result.Steps) != 1 {

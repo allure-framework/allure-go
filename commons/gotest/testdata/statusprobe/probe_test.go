@@ -129,14 +129,26 @@ func TestParallelIsolation(t *testing.T) {
 }
 
 func TestWrappedCurrentTest(t *testing.T) {
+	opts := []allure.Option{allure.WithIDGenerator(probeIDs("wrap-current"))}
+	if pkg := os.Getenv("ALLURE_GOTEST_SOURCE_PACKAGE"); pkg != "" {
+		opts = append(opts, allure.WithTitlePath("tests", pkg, "create_test.go"))
+	}
+	wrapCurrentTest(t, opts...)
+}
+
+func TestWrappedResetTitlePath(t *testing.T) {
+	wrapCurrentTest(t, allure.WithTitlePath("tests", "create_test.go"), allure.WithTitlePath())
+}
+
+func wrapCurrentTest(t *testing.T, opts ...allure.Option) {
 	allure.Wrap(t, func(a *allure.Context) {
 		a.Description("Exercises Wrap against the current Go test. " +
-			"The expected result is a single Allure result named after the Go test with a module-relative file title path.")
+			"The expected result is a single Allure result named after the Go test with its source title path.")
 		a.Label("wrapCase", "current")
 		a.Step("record wrapped test evidence", func(a *allure.Context) {
 			a.Attachment("wrap payload", []byte("wrapped-current"), "text/plain")
 		})
-	}, allure.WithIDGenerator(probeIDs("wrap-current")))
+	}, opts...)
 }
 
 func TestDuplicateWrapFails(t *testing.T) {
@@ -196,6 +208,14 @@ func TestPlanAllureIDSelection(t *testing.T) {
 }
 
 func TestPlanFullNameSelection(t *testing.T) {
+	runFullNameSelection(t)
+}
+
+func TestPlanExplicitFullNameSelection(t *testing.T) {
+	runFullNameSelection(t, allure.WithTitlePath("tests", "plan_test.go"))
+}
+
+func runFullNameSelection(t *testing.T, opts ...allure.Option) {
 	allure.Test(t, "selected-by-full-name", func(a *allure.Context) {
 		a.Description("Exercises gotest test-plan filtering with a full-name selector. " +
 			"The expected result is that only the matching full-name test body runs and produces a reported result.")
@@ -203,11 +223,11 @@ func TestPlanFullNameSelection(t *testing.T) {
 		a.Step("record selected full-name payload", func(a *allure.Context) {
 			a.Attachment("parallel payload", []byte("selected-full-name"), "text/plain")
 		})
-	}, allure.WithIDGenerator(probeIDs("plan-selected-full-name")))
+	}, append(opts, allure.WithIDGenerator(probeIDs("plan-selected-full-name")))...)
 
 	allure.Test(t, "deselected-by-full-name", func(a *allure.Context) {
 		a.T().Fatalf("deselected full-name test body should not run")
-	}, allure.WithIDGenerator(probeIDs("plan-deselected-full-name")))
+	}, append(opts, allure.WithIDGenerator(probeIDs("plan-deselected-full-name")))...)
 }
 
 func probeIDs(prefix string) func() string {

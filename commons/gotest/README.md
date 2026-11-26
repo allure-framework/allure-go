@@ -60,6 +60,20 @@ By default, results are written to `./allure-results`. Set `ALLURE_RESULTS_DIR` 
 
 Set `ALLURE_LABEL_<NAME>` environment variables to add labels to every reported test in the run. Names are normalized to Allure-style lower camel case, so `ALLURE_LABEL_MODULE=commons` becomes `module=commons` and `ALLURE_LABEL_PARENT_SUITE=runtime` becomes `parentSuite=runtime`.
 
+## Source paths for wrappers
+
+A wrapper around `allure.Test` or `allure.Wrap` can use `WithTitlePath` to report the source of the user's test. Supply the path as segments and omit the native test name. Both helpers append the reported test's `t.Name()` when building its full name.
+
+```go
+allure.Wrap(t, body, allure.WithTitlePath("tests", "popup", "popup_test.go"))
+```
+
+For a Go subtest named `TestCreate/success`, the full name is `tests/popup/popup_test.go/TestCreate/success`. Test plans can select this full name before the body runs. The same path supplies the default suite hierarchy. Setting any explicit `parentSuite`, `suite`, or `subSuite` label suppresses that generated hierarchy.
+
+The last `WithTitlePath` wins. Empty segments are ignored. If the option is omitted or the final path is empty, both helpers keep their existing caller-based behavior. The option copies its input and can be shared across parallel tests.
+
+**Compatibility.** Adapters are responsible for choosing a stable path that distinguishes tests with the same Go name. Moving an existing test to a different path changes its default test case ID and history ID and may split its Allure history. Explicit IDs keep their existing precedence.
+
 ## Testify Assertions
 
 Use the separate `github.com/allure-framework/allure-go/testify` module when testify assertion calls should appear as Allure steps:
