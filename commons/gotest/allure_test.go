@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -221,6 +222,7 @@ func TestStaticOptionsWriteInitialMetadata(t *testing.T) {
 				WithDescription(childDescription),
 				WithDescriptionHTML(childDescriptionHTML),
 				WithDisplayName("display static options"),
+				WithTitlePath("adapter", "static_test.go"),
 				WithTestCaseName("logical static options"),
 				WithTestCaseID("case-static"),
 				WithHistoryID("history-static"),
@@ -394,6 +396,46 @@ func TestTitlePathIncludesPackageFolders(t *testing.T) {
 			}
 		})
 	})
+}
+
+func TestReusableTitlePath(t *testing.T) {
+	parts := []string{"tests", "", "source_test.go"}
+	source := WithTitlePath(parts...)
+	parts[0] = "changed"
+
+	for _, tc := range []struct {
+		name string
+		last Option
+		want []string
+	}{
+		{"first use", source, []string{"tests", "source_test.go"}},
+		{"second use", source, []string{"tests", "source_test.go"}},
+		{"empty path", WithTitlePath(), []string{"gotest", "allure_test.go"}},
+		{"empty segments", WithTitlePath("", ""), []string{"gotest", "allure_test.go"}},
+	} {
+		Test(t, tc.name, func(a *Context) {
+			a.T().Parallel()
+			a.Description("Applies a title path option to a child test after the input slice has changed. " +
+				"The last option should select the original segments or restore caller-based detection.")
+			a.Step("verify the child's reported path and full name", func(a *Context) {
+				memory := commonswriter.NewInMemoryWriter()
+				Test(a.T(), "child", func(a *Context) {
+					a.Description("Records the source selected by the title path options.")
+				}, WithWriter(memory), WithTitlePath("overridden"), tc.last)
+
+				snapshot := memory.Snapshot()
+				a.Attachment("reported child", []byte(snapshotEvidence(snapshot, nil)), "text/plain")
+				if len(snapshot.Results) != 1 {
+					a.T().Fatalf("expected one child result, got %d", len(snapshot.Results))
+				}
+				result := snapshot.Results[0]
+				name := strings.Join(tc.want, "/") + "/" + a.T().Name() + "/child"
+				if !slices.Equal(result.TitlePath, tc.want) || result.FullName != name {
+					a.T().Fatalf("want title path %q and full name %q, got %q and %q", tc.want, name, result.TitlePath, result.FullName)
+				}
+			})
+		})
+	}
 }
 
 func TestModuleRelativeFilePath(t *testing.T) {
@@ -602,7 +644,7 @@ func TestSuiteHierarchyOverridesSuppressGeneratedResultLabels(t *testing.T) {
 				id:    "static-suite",
 				name:  "static suite override child",
 				suite: "custom static",
-				opts:  []Option{WithSuite("custom static")},
+				opts:  []Option{WithSuite("custom static"), WithTitlePath("tests", "suite_test.go")},
 			},
 			{
 				id:    "runtime-suite",

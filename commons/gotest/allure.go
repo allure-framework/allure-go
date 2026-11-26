@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -202,6 +203,17 @@ func WithDescriptionHTML(html string) Option {
 	}
 }
 
+// WithTitlePath sets the path segments preceding the native Go test name.
+// Wrappers can supply the test's source path here. Empty segments are ignored.
+// The last WithTitlePath wins. An empty path restores caller-based detection.
+// The option copies its input and can be reused across parallel tests.
+func WithTitlePath(parts ...string) Option {
+	path := titlePath(parts)
+	return func(options *options) {
+		options.titlePath = slices.Clone(path)
+	}
+}
+
 // WithDisplayName sets the static display name before the test body runs.
 func WithDisplayName(name string) Option {
 	return func(options *options) {
@@ -285,7 +297,9 @@ func Test(t *testing.T, name string, body func(*Context), opts ...Option) {
 	for _, opt := range opts {
 		opt(&cfg)
 	}
-	cfg.titlePath = callerTitlePath(1)
+	if len(cfg.titlePath) == 0 {
+		cfg.titlePath = callerTitlePath(1)
+	}
 
 	t.Run(name, func(t *testing.T) {
 		t.Helper()
@@ -307,7 +321,9 @@ func Wrap(t *testing.T, body func(*Context), opts ...Option) {
 	for _, opt := range opts {
 		opt(&cfg)
 	}
-	cfg.titlePath = callerTitlePath(1)
+	if len(cfg.titlePath) == 0 {
+		cfg.titlePath = callerTitlePath(1)
+	}
 
 	runTest(t, t.Name(), body, cfg)
 }
@@ -366,14 +382,13 @@ func runTest(t *testing.T, name string, body func(*Context), cfg options) {
 	t.Helper()
 
 	start := cfg.now()
-	titlePath := titlePath(cfg.titlePath)
 	result := model.TestResult{
 		UUID:         cfg.newID(),
 		Name:         name,
 		TestCaseName: name,
-		FullName:     fullName(titlePath, t.Name()),
+		FullName:     fullName(cfg.titlePath, t.Name()),
 		Stage:        model.StageRunning,
-		TitlePath:    titlePath,
+		TitlePath:    cfg.titlePath,
 		Labels: []model.Label{
 			{Name: "framework", Value: "go-test"},
 			{Name: "language", Value: "go"},
